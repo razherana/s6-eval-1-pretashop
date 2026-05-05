@@ -1,10 +1,14 @@
-import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import App from './App.tsx'
+import { mainRoutes } from './routes/mainRoutes.ts';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { Toaster } from './components/ui/sonner.tsx';
+
+const router = createBrowserRouter(mainRoutes);
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
+  <>
+    <Toaster position="top-right" />
+    <RouterProvider router={router} />
+  </>,
 )
