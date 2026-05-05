@@ -1,0 +1,62 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: prestashop-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./prestashop:/var/www/html/prestashop
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - php
+    networks:
+      - prestashop-network
+
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: prestashop-php
+    volumes:
+      - ./prestashop:/var/www/html/prestashop
+      - ./prestashop.ini:/usr/local/etc/php/conf.d/prestashop.ini
+    depends_on:
+      - mysql
+    networks:
+      - prestashop-network
+    environment:
+      - PHP_MEMORY_LIMIT=256M
+      - PHP_UPLOAD_MAX_FILESIZE=64M
+      - PHP_POST_MAX_SIZE=64M
+      - PHP_MAX_EXECUTION_TIME=300
+    user: root
+    command: >
+      sh -c "chown -R www-data:www-data /var/www/html/prestashop &&
+            chmod -R 777 /var/www/html/prestashop &&
+            php-fpm"
+
+  mysql:
+    image: mysql:8.0
+    container_name: prestashop-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=prestashop
+      - MYSQL_DATABASE=prestashop
+      - MYSQL_USER=prestashop
+      - MYSQL_PASSWORD=prestashop
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql_init:/docker-entrypoint-initdb.d
+    networks:
+      - prestashop-network
+    command: --default-authentication-plugin=mysql_native_password
+
+networks:
+  prestashop-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
