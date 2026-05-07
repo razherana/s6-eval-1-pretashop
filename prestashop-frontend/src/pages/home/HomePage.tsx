@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { API_QUERY } from '@/utils/url';
-import { type Product, LANGUAGE_ID } from './types';
+import { type ProductReadXML, LANGUAGE_ID } from './types';
 import { fetchProducts } from './services';
 import { toast } from 'sonner';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { ImportProductsModalComponent } from './components/ImportProductsModalComponent';
 
 export function HomePage() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ProductReadXML[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,7 +52,7 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen bg-linear-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-      <ImportProductsModalComponent open={importProductsOpen} importResult={undefined} />
+      <ImportProductsModalComponent open={importProductsOpen} />
 
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8 flex items-center justify-between">
@@ -97,7 +97,7 @@ export function HomePage() {
                 className="group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
               >
                 <div className="relative overflow-hidden bg-gray-100 dark:bg-gray-800">
-                  {product.associations.images.image.length > 0 ? (
+                  {product.associations.images.image && product.associations.images.image.length > 0 ? (
                     <img
                       src={`${product.associations.images.image[0]['@_xlink:href']}?${API_QUERY}`}
                       alt={product.name.language[LANGUAGE_ID]['#text']}
@@ -135,7 +135,7 @@ export function HomePage() {
                       <Package className="h-4 w-4" />
                       In Stock
                     </span>
-                    {product.associations.images.image.length > 1 && (
+                    {product.associations.images.image && product.associations.images.image.length > 1 && (
                       <Badge variant="outline" className="text-xs">
                         +{product.associations.images.image.length - 1} images
                       </Badge>

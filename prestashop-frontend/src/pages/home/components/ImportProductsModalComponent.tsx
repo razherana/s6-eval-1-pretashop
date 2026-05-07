@@ -2,14 +2,25 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useState, useRef } from "react";
-import { Upload, FileText, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Upload, FileText, CheckCircle, XCircle, AlertCircle, ChevronLeft, ChevronRight, Table2, ArrowLeft } from "lucide-react";
 import { parseCSV } from "@/utils/csv";
-import { verifyProductData } from "../services";
+import { createProduct, verifyProductData } from "../services";
 import { toast } from "sonner";
+import { PrestaShopXMLConverter } from "@/utils/xml";
+import { urlPrestashopApi } from "@/utils/url";
+import productSchema from "@/schemas/product";
 
 interface RawProductCSV {
   [key: string]: string;
+}
+
+interface ImportedRow {
+  index: number;
+  data: RawProductCSV;
+  success: boolean;
+  error?: string;
 }
 
 export function ImportProductsModalComponent({ open }: { open: boolean }) {
@@ -24,6 +35,10 @@ export function ImportProductsModalComponent({ open }: { open: boolean }) {
   const [rowResults, setRowResults] = useState<boolean[]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [headers, setHeaders] = useState<string[]>([]);
+  const [importedRows, setImportedRows] = useState<ImportedRow[]>([]);
+  const [showResultsTable, setShowResultsTable] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 25;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,29 +53,19 @@ export function ImportProductsModalComponent({ open }: { open: boolean }) {
       setRowResults([]);
       setTotalRows(0);
       setHeaders([]);
+      setImportedRows([]);
+      setShowResultsTable(false);
+      setCurrentPage(1);
     } else {
       alert("Please select a valid CSV file");
     }
   };
 
   // Real API call to import a product
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const importProduct = async (product: RawProductCSV, rowIndex: number): Promise<boolean> => {
+  const importProduct = async (product: RawProductCSV, rowIndex: number, converter: PrestaShopXMLConverter): Promise<boolean> => {
     try {
-      // Replace this with your actual API endpoint
-      const response = await fetch('/api/products', {
-        method: 'POST',
-        headers: {
-          // Send as xml data
-          'Content-Type': 'application/xml',
-        },
-        body: JSON.stringify(product),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Failed to import product: ${response.statusText}`);
-      }
+      // Call service
+      await createProduct(product, converter);
 
       return true;
     } catch (error) {
@@ -83,6 +88,9 @@ export function ImportProductsModalComponent({ open }: { open: boolean }) {
     setRowResults([]);
     setTotalRows(0);
     setHeaders([]);
+    setImportedRows([]);
+    setShowResultsTable(false);
+    setCurrentPage(1);
 
     try {
       const text = await file.text();
@@ -108,42 +116,52 @@ export function ImportProductsModalComponent({ open }: { open: boolean }) {
       let failed = 0;
       const importErrors: string[] = [];
       const results: boolean[] = [];
+      const rows: ImportedRow[] = [];
 
       // Process each row/product
       for (let i = 0; i < total; i++) {
         const product = parsedData[i];
 
-        if (!verifyProductData(product, extractedHeaders)) {
-          const errorMessage = `Row ${parsedData.indexOf(product) + 1}: Missing required fields.`;
+        const verificationResult = verifyProductData(product, extractedHeaders);
+        if (verificationResult !== true) {
+          const errorMessage = `Row ${parsedData.indexOf(product) + 1}: Missing required field: ${verificationResult}`;
           setErrors(prev => [...prev, errorMessage]);
           console.warn(errorMessage, product);
         }
 
+        const productXmlConverter = new PrestaShopXMLConverter(productSchema, urlPrestashopApi('/products'));
+
+
         try {
           // Call the actual API to import the product
-          // const isSuccess = await importProduct(product, i);
-          const isSuccess = Math.random() > 0.2; // Simulate success/failure with 80% success rate
+          const isSuccess = await importProduct(product, i, productXmlConverter);
 
           if (isSuccess) {
             success++;
             setSuccessCount(success);
             results.push(true);
+            rows.push({ index: i + 1, data: product, success: true });
           } else {
             failed++;
             setFailedCount(failed);
             results.push(false);
-            importErrors.push(`Row ${i + 1}: Failed to import product - ${JSON.stringify(product)}`);
+            const errorMsg = `Row ${i + 1}: Failed to import product - ${JSON.stringify(product)}`;
+            importErrors.push(errorMsg);
+            rows.push({ index: i + 1, data: product, success: false, error: errorMsg });
           }
         } catch (error) {
           failed++;
           setFailedCount(failed);
           results.push(false);
           const errorMessage = error instanceof Error ? error.message : String(error);
-          importErrors.push(`Row ${i + 1}: ${errorMessage}`);
+          const fullError = `Row ${i + 1}: ${errorMessage}`;
+          importErrors.push(fullError);
+          rows.push({ index: i + 1, data: product, success: false, error: fullError });
         }
 
         // Update progress and results
         setRowResults([...results]);
+        setImportedRows([...rows]);
         const currentProgress = Math.round(((i + 1) / total) * 100);
         setProgress(currentProgress);
 
@@ -196,6 +214,9 @@ export function ImportProductsModalComponent({ open }: { open: boolean }) {
       setRowResults([]);
       setTotalRows(0);
       setHeaders([]);
+      setImportedRows([]);
+      setShowResultsTable(false);
+      setCurrentPage(1);
     }
   };
 
@@ -225,249 +246,393 @@ export function ImportProductsModalComponent({ open }: { open: boolean }) {
     URL.revokeObjectURL(url);
   };
 
+  // Pagination logic
+  const totalPages = Math.ceil(importedRows.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const currentRows = importedRows.slice(startIndex, endIndex);
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(prev => prev + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
+    }
+  };
+
   return (
     <Dialog open={open}>
-      <DialogContent className="sm:max-w-225 p-0">
-        <div className="flex h-150">
-          {/* Left Panel - Import Configuration */}
-          <div className="flex-1 p-6 flex flex-col">
-            <DialogHeader className="mb-6">
-              <DialogTitle>Import Products from CSV</DialogTitle>
-              <DialogDescription>
-                Upload a CSV file and configure the import settings.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-6 flex-1">
-              {/* File Upload Area */}
-              <div
-                className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors"
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-                {file ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <FileText className="h-6 w-6 text-primary" />
-                    <span className="text-sm font-medium">{file.name}</span>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-2">
-                    <Upload className="h-8 w-8 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                      Click to upload or drag and drop
+      <DialogContent className={`${showResultsTable ? 'sm:max-w-[95vw] h-[95vh]' : 'sm:max-w-225'} p-0 transition-all duration-300`}>
+        {showResultsTable ? (
+          // Full Screen Results Table View
+          <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className="p-4 border-b bg-gray-50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowResultsTable(false)}
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back to Import
+                  </Button>
+                  <div>
+                    <h3 className="font-semibold text-sm">Import Results Detail</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {file?.name} • {importedRows.length} rows processed
                     </p>
-                    <p className="text-xs text-muted-foreground">CSV files only</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Separator Configuration */}
-              <div className="space-y-2">
-                <Label htmlFor="separator">CSV Separator</Label>
-                <Input
-                  id="separator"
-                  value={separator}
-                  onChange={(e) => setSeparator(e.target.value)}
-                  placeholder="Enter separator (default: ,)"
-                  maxLength={1}
-                  disabled={isImporting}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Common: comma (,), semicolon (;), tab (\t), pipe (|)
-                </p>
-              </div>
-
-              {/* Headers Preview (if available) */}
-              {headers.length > 0 && !isImporting && (
-                <div className="space-y-2">
-                  <Label>Detected Columns</Label>
-                  <div className="flex flex-wrap gap-2 p-2 bg-gray-50 rounded-md max-h-24 overflow-y-auto border-2">
-                    {headers.map((header, index) => (
-                      <span key={index} className="text-xs px-2 py-1 bg-white border rounded-md">
-                        {header}
-                      </span>
-                    ))}
                   </div>
                 </div>
-              )}
-
-              {/* Progress Bar (only during import) */}
-              {isImporting && (
-                <div className="space-y-2">
-                  <Label>Import Progress</Label>
-                  <div className="flex gap-1 rounded-lg overflow-hidden bg-gray-100 p-1">
-                    {successCount > 0 && (
-                      <div
-                        className="h-2 bg-emerald-400 rounded-md transition-all duration-500 ease-in-out"
-                        style={{ width: `${successPercentage}%` }}
-                      />
-                    )}
-                    {failedCount > 0 && (
-                      <div
-                        className="h-2 bg-rose-400 rounded-md transition-all duration-500 ease-in-out"
-                        style={{ width: `${failedPercentage}%` }}
-                      />
-                    )}
-                    <div
-                      className="h-2 bg-gray-200 rounded-md transition-all duration-500 ease-in-out flex-1"
-                    />
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="flex items-center gap-1">
+                      <CheckCircle className="h-4 w-4 text-emerald-500" />
+                      <span className="font-medium text-emerald-600">{successCount} success</span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <XCircle className="h-4 w-4 text-rose-500" />
+                      <span className="font-medium text-rose-600">{failedCount} failed</span>
+                    </span>
                   </div>
-                  <p className="text-xs text-muted-foreground text-right">{progress}% complete</p>
-                  <p className="text-xs text-center text-muted-foreground">
-                    Processing row {successCount + failedCount} of {totalRows}...
-                  </p>
+                  {errors.length > 0 && (
+                    <Button variant="outline" size="sm" onClick={downloadErrorReport}>
+                      Download Error Report
+                    </Button>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              <Button variant="outline" onClick={() => window.close()}>
-                Cancel
-              </Button>
-              {importComplete && errors.length > 0 && (
-                <Button variant="outline" onClick={downloadErrorReport}>
-                  Download Error Report
-                </Button>
-              )}
-              <Button
-                onClick={handleImport}
-                disabled={!file || isImporting}
-              >
-                {isImporting ? "Importing..." : "Start Import"}
-              </Button>
+            {/* Table */}
+            <div className="flex-1 overflow-auto">
+              <Table>
+                <TableHeader className="sticky top-0 bg-white z-10">
+                  <TableRow>
+                    <TableHead className="w-16 text-center sticky left-0 bg-white">Row</TableHead>
+                    <TableHead className="w-20 text-center">Status</TableHead>
+                    {headers.map((header, index) => (
+                      <TableHead key={index} className="min-w-40">{header}</TableHead>
+                    ))}
+                    <TableHead className="min-w-60">Error</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {currentRows.map((row) => (
+                    <TableRow
+                      key={row.index}
+                      className={`${row.success
+                          ? 'bg-emerald-50/50 hover:bg-emerald-100/50'
+                          : 'bg-rose-50/50 hover:bg-rose-100/50'
+                        } transition-colors`}
+                    >
+                      <TableCell className="text-center font-mono text-xs sticky left-0 bg-inherit">
+                        {row.index}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {row.success ? (
+                          <CheckCircle className="h-4 w-4 text-emerald-500 inline-block" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-rose-500 inline-block" />
+                        )}
+                      </TableCell>
+                      {headers.map((header, index) => (
+                        <TableCell key={index} className="text-xs max-w-48 truncate">
+                          {row.data[header] || '-'}
+                        </TableCell>
+                      ))}
+                      <TableCell className="text-xs text-rose-600 max-w-60 truncate">
+                        {row.error || '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Pagination Footer */}
+            <div className="border-t p-4 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Showing {startIndex + 1}-{Math.min(endIndex, importedRows.length)} of {importedRows.length} rows
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={goToPreviousPage}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground min-w-24 text-center">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={goToNextPage}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
+        ) : (
+          // Import Configuration View
+          <div className="flex h-150">
+            {/* Left Panel - Import Configuration */}
+            <div className="flex-1 p-6 flex flex-col">
+              <DialogHeader className="mb-6">
+                <DialogTitle>Import Products from CSV</DialogTitle>
+                <DialogDescription>
+                  Upload a CSV file and configure the import settings.
+                </DialogDescription>
+              </DialogHeader>
 
-          {/* Right Panel - Import Results */}
-          <div className="w-80 border-l bg-gray-50 flex flex-col">
-            <div className="p-4 border-b bg-white">
-              <h3 className="font-semibold text-sm">Import Results</h3>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {!isImporting && !importComplete && (
-                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
-                  <AlertCircle className="h-8 w-8 mb-2 opacity-50" />
-                  <p className="text-sm">Start an import to see results here</p>
-                </div>
-              )}
-
-              {/* Stats Cards */}
-              {(isImporting || importComplete) && (
-                <>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-white rounded-lg p-3 border border-emerald-100">
-                      <div className="flex items-center gap-2 mb-1">
-                        <CheckCircle className="h-4 w-4 text-emerald-500" />
-                        <span className="text-xs font-medium text-emerald-700">Success</span>
-                      </div>
-                      <p className="text-2xl font-bold text-emerald-600">{successCount}</p>
+              <div className="space-y-6 flex-1">
+                {/* File Upload Area */}
+                <div
+                  className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors"
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  {file ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <FileText className="h-6 w-6 text-primary" />
+                      <span className="text-sm font-medium">{file.name}</span>
                     </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <Upload className="h-8 w-8 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        Click to upload or drag and drop
+                      </p>
+                      <p className="text-xs text-muted-foreground">CSV files only</p>
+                    </div>
+                  )}
+                </div>
 
-                    <div className="bg-white rounded-lg p-3 border border-rose-100">
-                      <div className="flex items-center gap-2 mb-1">
-                        <XCircle className="h-4 w-4 text-rose-500" />
-                        <span className="text-xs font-medium text-rose-700">Failed</span>
-                      </div>
-                      <p className="text-2xl font-bold text-rose-600">{failedCount}</p>
+                {/* Separator Configuration */}
+                <div className="space-y-2">
+                  <Label htmlFor="separator">CSV Separator</Label>
+                  <Input
+                    id="separator"
+                    value={separator}
+                    onChange={(e) => setSeparator(e.target.value)}
+                    placeholder="Enter separator (default: ,)"
+                    maxLength={1}
+                    disabled={isImporting}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Common: comma (,), semicolon (;), tab (\t), pipe (|)
+                  </p>
+                </div>
+
+                {/* Headers Preview (if available) */}
+                {headers.length > 0 && !isImporting && (
+                  <div className="space-y-2">
+                    <Label>Detected Columns</Label>
+                    <div className="flex flex-wrap gap-2 p-2 bg-gray-50 rounded-md max-h-24 overflow-y-auto border-2">
+                      {headers.map((header, index) => (
+                        <span key={index} className="text-xs px-2 py-1 bg-white border rounded-md">
+                          {header}
+                        </span>
+                      ))}
                     </div>
                   </div>
+                )}
 
-                  {/* Summary Progress Bar */}
-                  <div className="bg-white rounded-lg p-3 border">
-                    <p className="text-xs font-medium mb-2">Progress</p>
-                    <div className="flex gap-1 h-3 rounded-full overflow-hidden bg-gray-200 mb-2">
+                {/* Progress Bar (only during import) */}
+                {isImporting && (
+                  <div className="space-y-2">
+                    <Label>Import Progress</Label>
+                    <div className="flex gap-1 rounded-lg overflow-hidden bg-gray-100 p-1">
                       {successCount > 0 && (
                         <div
-                          className="bg-emerald-500 transition-all duration-500"
+                          className="h-2 bg-emerald-400 rounded-md transition-all duration-500 ease-in-out"
                           style={{ width: `${successPercentage}%` }}
                         />
                       )}
                       {failedCount > 0 && (
                         <div
-                          className="bg-rose-500 transition-all duration-500"
+                          className="h-2 bg-rose-400 rounded-md transition-all duration-500 ease-in-out"
                           style={{ width: `${failedPercentage}%` }}
                         />
                       )}
+                      <div
+                        className="h-2 bg-gray-200 rounded-md transition-all duration-500 ease-in-out flex-1"
+                      />
                     </div>
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>{totalRows} total rows</span>
-                      <span>{progress}%</span>
-                    </div>
+                    <p className="text-xs text-muted-foreground text-right">{progress}% complete</p>
+                    <p className="text-xs text-center text-muted-foreground">
+                      Processing row {successCount + failedCount} of {totalRows}...
+                    </p>
                   </div>
+                )}
+              </div>
 
-                  {/* Row-by-row indicators */}
-                  <div className="bg-white rounded-lg p-3 border">
-                    <p className="text-xs font-medium mb-2">Row Status</p>
-                    <div className="flex gap-0.5 flex-wrap max-h-24 overflow-y-auto">
-                      {Array.from({ length: Math.min(totalRows, 150) }).map((_, index) => {
-                        if (index < rowResults.length) {
-                          return (
-                            <div
-                              key={index}
-                              className={`w-2 h-2 rounded-sm transition-all duration-300 ${rowResults[index]
-                                ? "bg-emerald-400"
-                                : "bg-rose-400"
-                                }`}
-                              title={`Row ${index + 1}: ${rowResults[index] ? 'Success' : 'Failed'}`}
-                            />
-                          );
-                        } else {
-                          return (
-                            <div
-                              key={index}
-                              className="w-2 h-2 rounded-sm bg-gray-200"
-                            />
-                          );
-                        }
-                      })}
-                      {totalRows > 150 && (
-                        <span className="text-xs text-muted-foreground ml-2 self-center">
-                          +{totalRows - 150} more
-                        </span>
-                      )}
-                    </div>
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button variant="outline" onClick={() => window.close()}>
+                  Cancel
+                </Button>
+                {importComplete && importedRows.length > 0 && (
+                  <Button
+                    onClick={() => setShowResultsTable(true)}
+                  >
+                    <Table2 className="h-4 w-4 mr-2" />
+                    Show Results
+                  </Button>
+                )}
+                <Button
+                  onClick={handleImport}
+                  disabled={!file || isImporting}
+                >
+                  {isImporting ? "Importing..." : "Start Import"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Right Panel - Import Results Summary */}
+            <div className="w-80 border-l bg-gray-50 flex flex-col">
+              <div className="p-4 border-b bg-white">
+                <h3 className="font-semibold text-sm">Import Results</h3>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {!isImporting && !importComplete && (
+                  <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+                    <AlertCircle className="h-8 w-8 mb-2 opacity-50" />
+                    <p className="text-sm">Start an import to see results here</p>
                   </div>
+                )}
 
-                  {/* Errors List */}
-                  {errors.length > 0 && (
-                    <div className="bg-white rounded-lg border border-rose-100 overflow-hidden">
-                      <div className="p-3 border-b border-rose-100 bg-rose-50">
-                        <div className="flex items-center gap-2">
-                          <XCircle className="h-4 w-4 text-rose-500" />
-                          <p className="text-xs font-medium text-rose-700">
-                            Errors ({errors.length})
-                          </p>
+                {/* Stats Cards */}
+                {(isImporting || importComplete) && (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-white rounded-lg p-3 border border-emerald-100">
+                        <div className="flex items-center gap-2 mb-1">
+                          <CheckCircle className="h-4 w-4 text-emerald-500" />
+                          <span className="text-xs font-medium text-emerald-700">Success</span>
                         </div>
+                        <p className="text-2xl font-bold text-emerald-600">{successCount}</p>
                       </div>
-                      <div className="max-h-48 overflow-y-auto">
-                        {errors.map((error, index) => (
+
+                      <div className="bg-white rounded-lg p-3 border border-rose-100">
+                        <div className="flex items-center gap-2 mb-1">
+                          <XCircle className="h-4 w-4 text-rose-500" />
+                          <span className="text-xs font-medium text-rose-700">Failed</span>
+                        </div>
+                        <p className="text-2xl font-bold text-rose-600">{failedCount}</p>
+                      </div>
+                    </div>
+
+                    {/* Summary Progress Bar */}
+                    <div className="bg-white rounded-lg p-3 border">
+                      <p className="text-xs font-medium mb-2">Progress</p>
+                      <div className="flex gap-1 h-3 rounded-full overflow-hidden bg-gray-200 mb-2">
+                        {successCount > 0 && (
                           <div
-                            key={index}
-                            className="p-2 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
-                          >
-                            <p className="text-xs text-gray-600 whitespace-pre-wrap wrap-break-word">
-                              {error}
+                            className="bg-emerald-500 transition-all duration-500"
+                            style={{ width: `${successPercentage}%` }}
+                          />
+                        )}
+                        {failedCount > 0 && (
+                          <div
+                            className="bg-rose-500 transition-all duration-500"
+                            style={{ width: `${failedPercentage}%` }}
+                          />
+                        )}
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{totalRows} total rows</span>
+                        <span>{progress}%</span>
+                      </div>
+                    </div>
+
+                    {/* Row-by-row indicators */}
+                    <div className="bg-white rounded-lg p-3 border">
+                      <p className="text-xs font-medium mb-2">Row Status</p>
+                      <div className="flex gap-0.5 flex-wrap max-h-24 overflow-y-auto">
+                        {Array.from({ length: Math.min(totalRows, 150) }).map((_, index) => {
+                          if (index < rowResults.length) {
+                            return (
+                              <div
+                                key={index}
+                                className={`w-2 h-2 rounded-sm transition-all duration-300 ${rowResults[index]
+                                  ? "bg-emerald-400"
+                                  : "bg-rose-400"
+                                  }`}
+                                title={`Row ${index + 1}: ${rowResults[index] ? 'Success' : 'Failed'}`}
+                              />
+                            );
+                          } else {
+                            return (
+                              <div
+                                key={index}
+                                className="w-2 h-2 rounded-sm bg-gray-200"
+                              />
+                            );
+                          }
+                        })}
+                        {totalRows > 150 && (
+                          <span className="text-xs text-muted-foreground ml-2 self-center">
+                            +{totalRows - 150} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Errors List */}
+                    {errors.length > 0 && (
+                      <div className="bg-white rounded-lg border border-rose-100 overflow-hidden">
+                        <div className="p-3 border-b border-rose-100 bg-rose-50">
+                          <div className="flex items-center gap-2">
+                            <XCircle className="h-4 w-4 text-rose-500" />
+                            <p className="text-xs font-medium text-rose-700">
+                              Errors ({errors.length})
                             </p>
                           </div>
-                        ))}
+                        </div>
+                        <div className="max-h-48 overflow-y-auto">
+                          {errors.map((error, index) => (
+                            <div
+                              key={index}
+                              className="p-2 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
+                            >
+                              <p className="text-xs text-gray-600 whitespace-pre-wrap wrap-break-word">
+                                {error}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </>
-              )}
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   );

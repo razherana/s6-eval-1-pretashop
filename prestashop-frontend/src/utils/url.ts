@@ -1,13 +1,12 @@
 import { readXml } from "./xml";
 
-export function urlPrestashopApi(path: string): string {
-  const baseUrl =
-    import.meta.env.VITE_PRESTASHOP_URL_API || "http://notsetenvforprestashop/";
+export function urlPrestashopApi(path: string = ""): string {
+  const baseUrl = API_URL;
   return `${baseUrl}${path}`;
 }
 
 export async function fetchFromPrestashopApi<T = unknown>(
-  path: string,
+  path: string = "",
   fetchOptions: RequestInit,
 ) {
   if (!fetchOptions.headers)
@@ -26,3 +25,5 @@ export async function fetchFromPrestashopApi<T = unknown>(
 export const API_QUERY = new URLSearchParams({
   ws_key: import.meta.env.VITE_PRESTASHOP_API_KEY,
 }).toString();
+
+export const API_URL = `${import.meta.env.VITE_PRESTASHOP_URL_API}`;

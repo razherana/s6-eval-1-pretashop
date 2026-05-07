@@ -1,4 +1,4 @@
-export interface Product {
+export interface ProductReadXML {
   id: number;
   name: {
     language: [
@@ -9,7 +9,7 @@ export interface Product {
   };
   associations: {
     images: {
-      image: [
+      image?: [
         {
           "@_xlink:href": string;
         },

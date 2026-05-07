@@ -1,10 +1,11 @@
 import { fetchFromPrestashopApi } from "@/utils/url";
-import type { Product } from "./types";
+import type { ProductReadXML } from "./types";
+import { PrestaShopXMLConverter } from "@/utils/xml";
 
 export async function fetchProducts(
   limit: number,
   offset: number,
-): Promise<Product[]> {
+): Promise<ProductReadXML[]> {
   const query = new URLSearchParams({
     display: "full",
     limit: limit.toString(),
@@ -27,13 +28,13 @@ export async function fetchProducts(
   }
 }
 
-const REQUIRED_FIELDS = ["price", "name;"];
+const PRODUCT_REQUIRED_FIELDS = ["price", "name;"];
 
 export function verifyProductData(
   productData: Record<string, string>,
   headers: string[],
 ): string | true {
-  for (const field of REQUIRED_FIELDS) {
+  for (const field of PRODUCT_REQUIRED_FIELDS) {
     if (!headers.includes(field) && !field.endsWith(";")) {
       console.warn(
         `Missing required header: ${field} in CSV headers:`,
@@ -71,4 +72,32 @@ export function verifyProductData(
   }
 
   return true;
+}
+
+export async function createProduct(
+  product: Record<string, string>,
+  converter: PrestaShopXMLConverter,
+) {
+  // Translate the product data from string, string to XML format
+
+  console.log("Creating product with data:", product);
+  const xmlData = converter.convertRowToXML(product);
+
+  console.log("Converted XML data:", xmlData);
+
+  try {
+    const response = await fetchFromPrestashopApi("/products", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/xml",
+      },
+      body: xmlData,
+    });
+
+    console.log("Product insert API response:", response);
+    return response;
+  } catch (error) {
+    console.error("Error creating product:", error);
+    throw error;
+  }
 }
