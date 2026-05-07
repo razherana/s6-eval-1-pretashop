@@ -8,18 +8,23 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ShoppingCart, Package, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ImportProductsModalComponent } from './components/ImportProductsModalComponent';
 
 export function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // State for import products modal
+  const [importProductsOpen, setImportProductsOpen] = useState(false);
+
   useEffect(() => {
     async function loadProducts() {
       try {
         setLoading(true);
         setError(null);
-        const data = fetchProducts(10, 0);
+        const data = fetchProducts(100, 0);
         setProducts(await data);
       } catch (error) {
         console.error("Error loading products:", error);
@@ -47,6 +52,8 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen bg-linear-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+      <ImportProductsModalComponent open={importProductsOpen} importResult={undefined} />
+
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8 flex items-center justify-between">
           <div>
@@ -57,10 +64,15 @@ export function HomePage() {
               Discover our latest products
             </p>
           </div>
-          <Badge variant="secondary" className="text-sm">
-            <Package className="mr-2 h-4 w-4" />
-            {loading ? '...' : `${products.length} Products`}
-          </Badge>
+          <div className='flex items-center space-x-2'>
+            <Badge variant="secondary">
+              <Package className="mr-2 h-4 w-4" />
+              {loading ? '...' : `${products.length} Products`}
+            </Badge>
+            <Button variant="outline" onClick={() => setImportProductsOpen(true)}>
+              Import Products
+            </Button>
+          </div>
         </div>
 
         {loading ? (
