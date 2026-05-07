@@ -32,14 +32,14 @@ const REQUIRED_FIELDS = ["price", "name;"];
 export function verifyProductData(
   productData: Record<string, string>,
   headers: string[],
-): boolean {
+): string | true {
   for (const field of REQUIRED_FIELDS) {
-    if (!headers.includes(field)) {
+    if (!headers.includes(field) && !field.endsWith(";")) {
       console.warn(
         `Missing required header: ${field} in CSV headers:`,
         headers,
       );
-      return false;
+      return field;
     }
 
     if (field.endsWith(";")) {
@@ -50,14 +50,23 @@ export function verifyProductData(
           `Missing required header variation: ${field} in CSV headers:`,
           headers,
         );
-        return false;
+        return field;
       }
+
+      // If the field is a variation (ends with ";"), we should check if at least one of the variations has a non-empty value in the product data
+      for (const header of headers)
+        if (
+          header.startsWith(field) &&
+          productData[header] &&
+          productData[header].trim() !== ""
+        )
+          continue; // Found a valid variation, we can consider this field as valid
     } else if (!productData[field] || productData[field].trim() === "") {
       console.warn(
         `Missing required field: ${field} for product data:`,
         productData,
       );
-      return false;
+      return field;
     }
   }
 
