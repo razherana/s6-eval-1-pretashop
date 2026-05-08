@@ -52,7 +52,7 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen bg-linear-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-      <ImportProductsModalComponent open={importProductsOpen} />
+      <ImportProductsModalComponent open={importProductsOpen} setOpen={setImportProductsOpen} />
 
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8 flex items-center justify-between">

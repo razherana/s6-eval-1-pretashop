@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { Upload, FileText, CheckCircle, XCircle, AlertCircle, ChevronLeft, ChevronRight, Table2, ArrowLeft } from "lucide-react";
 import { parseCSV } from "@/utils/csv";
 import { createProduct, verifyProductData } from "../services";
@@ -23,7 +23,7 @@ interface ImportedRow {
   error?: string;
 }
 
-export function ImportProductsModalComponent({ open }: { open: boolean }) {
+export function ImportProductsModalComponent({ open, setOpen }: { open: boolean, setOpen: React.Dispatch<React.SetStateAction<boolean>> }) {
   const [separator, setSeparator] = useState(",");
   const [file, setFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -265,8 +265,10 @@ export function ImportProductsModalComponent({ open }: { open: boolean }) {
   };
 
   return (
-    <Dialog open={open}>
-      <DialogContent className={`${showResultsTable ? 'sm:max-w-[95vw] h-[95vh]' : 'sm:max-w-225'} p-0 transition-all duration-300`}>
+    <Dialog open={open} >
+      <DialogContent 
+      onCloseClick={() => setOpen(false)}
+      className={`${showResultsTable ? 'sm:max-w-[95vw] h-[95vh]' : 'sm:max-w-225'} p-0 transition-all duration-300`}>
         {showResultsTable ? (
           // Full Screen Results Table View
           <div className="flex flex-col h-full">
@@ -491,7 +493,7 @@ export function ImportProductsModalComponent({ open }: { open: boolean }) {
 
               {/* Action Buttons */}
               <div className="flex justify-end gap-3 pt-4 border-t">
-                <Button variant="outline" onClick={() => window.close()}>
+                <Button variant="outline" onClick={() => setOpen(false)} disabled={isImporting}>
                   Cancel
                 </Button>
                 {importComplete && importedRows.length > 0 && (
