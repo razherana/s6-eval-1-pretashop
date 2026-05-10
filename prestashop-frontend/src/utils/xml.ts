@@ -2,11 +2,11 @@ import { XMLParser } from "fast-xml-parser";
 import { create } from "xmlbuilder2";
 import type { XMLBuilder } from "xmlbuilder2/lib/interfaces";
 
-export function readXml<T = unknown>(xmlString: string): T {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-  });
+const parser = new XMLParser({
+  ignoreAttributes: false,
+});
 
+export function readXml<T = unknown>(xmlString: string): T {
   const jsonObj = parser.parse(xmlString).prestashop;
 
   return jsonObj as T;
@@ -94,11 +94,13 @@ export class PrestaShopXMLConverter {
   ) {
     if (value === "" || value === undefined || value === null) return;
 
-    if(fieldSchema.attributes && fieldSchema.attributes.read_only === "true") {
-      console.warn(`Skipping read-only field "${tagName}" with value "${value}"`);
+    if (fieldSchema.attributes && fieldSchema.attributes.read_only === "true") {
+      console.warn(
+        `Skipping read-only field "${tagName}" with value "${value}"`,
+      );
       return;
     }
-    
+
     const attrs = this.buildAttributes(fieldSchema);
     parent.ele(tagName, attrs).dat(value);
   }

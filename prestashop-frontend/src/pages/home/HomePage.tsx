@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { API_QUERY } from '@/utils/url';
-import { type ProductReadXML, LANGUAGE_ID } from './types';
+import { type ProductReadXML } from './types';
 import { fetchProducts } from './services';
 import { toast } from 'sonner';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,11 +10,17 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ShoppingCart, Package, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ImportProductsModalComponent } from './components/ImportProductsModalComponent';
+import { ResetDataModalComponent } from './components/ResetDataModalComponent';
+import { getFormattedPrice, getWithLanguage, useLanguage } from '@/utils/lang';
 
 export function HomePage() {
   const [products, setProducts] = useState<ProductReadXML[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const { language } = useLanguage();
+
+  const [isResetOpen, setResetOpen] = useState(false);
 
   // State for import products modal
   const [importProductsOpen, setImportProductsOpen] = useState(false);
@@ -50,9 +56,37 @@ export function HomePage() {
     );
   }
 
+  // Remove the handleResetData function as it's now handled by the modal
+  // Or keep it as a callback for after reset is complete:
+  const handleResetComplete = () => {
+    // Refresh the product list after reset
+    async function loadProducts() {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = fetchProducts(100, 0);
+        setProducts(await data);
+      } catch (error) {
+        console.error("Error loading products:", error);
+        setError("Failed to load products. Please try again later.");
+        toast.error("Failed to load products. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadProducts();
+  };
+
   return (
     <div className="min-h-screen bg-linear-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       <ImportProductsModalComponent open={importProductsOpen} setOpen={setImportProductsOpen} />
+
+      <ResetDataModalComponent
+        open={isResetOpen}
+        setOpen={setResetOpen}
+        onResetComplete={handleResetComplete}
+      />
 
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8 flex items-center justify-between">
@@ -60,7 +94,7 @@ export function HomePage() {
             <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
               Prestashop
             </h1>
-            <p className="mt-2 text-lg text-muted-foreground">
+            <p className="mt-2 t`ext-lg text-muted-foreground">
               Discover our latest products
             </p>
           </div>
@@ -71,6 +105,9 @@ export function HomePage() {
             </Badge>
             <Button variant="outline" onClick={() => setImportProductsOpen(true)}>
               Import Products
+            </Button>
+            <Button variant="outline" onClick={() => setResetOpen(true)}>
+              Reset all data
             </Button>
           </div>
         </div>
@@ -100,7 +137,7 @@ export function HomePage() {
                   {product.associations.images.image && product.associations.images.image.length > 0 ? (
                     <img
                       src={`${product.associations.images.image[0]['@_xlink:href']}?${API_QUERY}`}
-                      alt={product.name.language[LANGUAGE_ID]['#text']}
+                      alt={getWithLanguage(product.name, language.language_id)}
                       className="h-48 w-full object-cover transition-transform duration-300 group-hover:scale-110"
                     />
                   ) : (
@@ -119,13 +156,13 @@ export function HomePage() {
 
                 <CardHeader>
                   <CardTitle className="line-clamp-2 text-lg">
-                    {product.name.language[LANGUAGE_ID]['#text']}
+                    {getWithLanguage(product.name, language.language_id)}
                   </CardTitle>
                 </CardHeader>
 
                 <CardContent>
                   <p className="text-2xl font-bold text-primary">
-                    ${product.price.toFixed(2)}
+                    {getFormattedPrice(product.price, language.currency, language.conversion_change, language.iso_name)}
                   </p>
                 </CardContent>
 
