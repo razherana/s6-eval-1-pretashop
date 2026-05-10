@@ -20,6 +20,7 @@ export interface ProductReadXML {
     };
   };
   price: number;
+  reference: string;
 }
 
 export interface OrderReadXML {

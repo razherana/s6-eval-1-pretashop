@@ -1,5 +1,10 @@
 import { fetchFromPrestashopApi } from "@/utils/url";
-import type { ProductReadXML, OrderReadXML, CustomerReadXML, OrderDetailReadXML } from "./types";
+import type {
+  ProductReadXML,
+  OrderReadXML,
+  CustomerReadXML,
+  OrderDetailReadXML,
+} from "./types";
 import { PrestaShopXMLConverter } from "@/utils/xml";
 
 export async function fetchProducts(
@@ -19,7 +24,22 @@ export async function fetchProducts(
       { method: "GET" },
     );
 
-    return response.products.product;
+    return ((response.products.product as ProductReadXML[]) || []).map(
+      (product) => ({
+        ...product,
+        associations: {
+          ...product.associations,
+          images: {
+            ...product.associations.images,
+            image:
+              !Array.isArray(product.associations.images.image) &&
+              product.associations.images.image
+                ? [product.associations.images.image]
+                : product.associations.images.image,
+          },
+        },
+      }),
+    );
   } catch (error) {
     console.error("Error fetching products:", error);
     throw error;
@@ -50,7 +70,9 @@ export async function fetchOrders(
   }
 }
 
-export async function fetchOrderDetails(orderId: number): Promise<OrderDetailReadXML[]> {
+export async function fetchOrderDetails(
+  orderId: number,
+): Promise<OrderDetailReadXML[]> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const response = await fetchFromPrestashopApi<any>(
@@ -101,22 +123,35 @@ export function verifyProductData(
 ): string | true {
   for (const field of PRODUCT_REQUIRED_FIELDS) {
     if (!headers.includes(field) && !field.endsWith(";")) {
-      console.warn(`Missing required header: ${field} in CSV headers:`, headers);
+      console.warn(
+        `Missing required header: ${field} in CSV headers:`,
+        headers,
+      );
       return field;
     }
 
     if (field.endsWith(";")) {
       const hasVariation = headers.some((header) => header.startsWith(field));
       if (!hasVariation) {
-        console.warn(`Missing required header variation: ${field} in CSV headers:`, headers);
+        console.warn(
+          `Missing required header variation: ${field} in CSV headers:`,
+          headers,
+        );
         return field;
       }
 
       for (const header of headers)
-        if (header.startsWith(field) && productData[header] && productData[header].trim() !== "")
+        if (
+          header.startsWith(field) &&
+          productData[header] &&
+          productData[header].trim() !== ""
+        )
           continue;
     } else if (!productData[field] || productData[field].trim() === "") {
-      console.warn(`Missing required field: ${field} for product data:`, productData);
+      console.warn(
+        `Missing required field: ${field} for product data:`,
+        productData,
+      );
       return field;
     }
   }

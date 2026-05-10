@@ -1,4 +1,4 @@
-import { getWithLanguage, useLanguage } from "@/utils/lang";
+import { getWithLanguage, upperFirstLetter, useLanguage } from "@/utils/lang";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -86,7 +86,8 @@ export function SelectLanguageCurrency() {
               <SelectContent>
                 {language.rawCurrencies.map((curr) => (
                   <SelectItem key={curr.id} value={curr.id.toString()}>
-                    {getWithLanguage(curr.names, language.language_id)}
+                    {upperFirstLetter(getWithLanguage(curr.names, language.language_id))}
+                    {curr.symbol && ` (${getWithLanguage(curr.symbol, language.language_id)})`}
                     {curr.conversion_rate !== 1 && ` (${curr.conversion_rate})`}
                   </SelectItem>
                 ))}

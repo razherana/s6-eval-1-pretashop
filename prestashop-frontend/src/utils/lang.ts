@@ -22,3 +22,8 @@ export function getWithLanguage(
 export function getFormattedPrice(price: number, currency: string, conversionChange: number, locale: string): string {
   return `${currency} ${(price * conversionChange).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+
+export function upperFirstLetter(str: string): string {
+  if (!str) return "";
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}

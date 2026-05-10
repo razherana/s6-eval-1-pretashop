@@ -52,8 +52,6 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({
             method: "GET",
           },
         )).languages.language;
-
-        console.log("Fetched  all language data:", rawLanguages);
       }
 
       // Fetch currency data based on language's iso_code
@@ -112,8 +110,6 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({
           rawCurrencies
         };
 
-        console.log("Fetched language and currency data:", newData);
-
         setLanguageReact(newData);
       }
     }
@@ -155,7 +151,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({
     },
     setCurrency: (rawCurrency: CurrencyReadXML) => {
       localStorage.setItem("currencyId", rawCurrency.id.toString());
-      
+
       setLanguageReact((prev) => {
         if (!prev) return prev;
 

@@ -94,6 +94,8 @@ export function HomePage() {
     loadProducts();
   };
 
+  console.log("Products : ", products); // Debug log to check product with ID 8
+
   return (
     <div className="min-h-screen bg-linear-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       <ImportProductsModalComponent open={importProductsOpen} setOpen={setImportProductsOpen} />
@@ -173,7 +175,7 @@ export function HomePage() {
                 className="group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
               >
                 <div className="relative overflow-hidden bg-gray-100 dark:bg-gray-800">
-                  {product.associations.images.image && product.associations.images.image.length > 0 ? (
+                  {product.associations.images.image && product.associations.images.image.length > 0 && product.associations.images.image[0] ? (
                     <img
                       src={`${product.associations.images.image[0]['@_xlink:href']}?${API_QUERY}`}
                       alt={getWithLanguage(product.name, language.language_id)}
