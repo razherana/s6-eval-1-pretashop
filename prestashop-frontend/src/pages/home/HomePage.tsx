@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { API_QUERY } from '@/utils/url';
 import { type ProductReadXML } from './types';
 import { fetchProducts } from './services';
 import { toast } from 'sonner';
@@ -7,13 +6,14 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ShoppingCart, Package, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ShoppingCart, Package, AlertCircle } from 'lucide-react';
 import { ImportProductsModalComponent } from './components/ImportProductsModalComponent';
 import { ResetDataModalComponent } from './components/ResetDataModalComponent';
 import { getFormattedPrice, getWithLanguage, useLanguage } from '@/utils/lang';
 import { SelectLanguageCurrency } from '@/components/ui-manual/select-lang';
 import { Spinner } from '@/components/ui/spinner';
+import { ProductImageCarouselComponent } from './components/ProductImageCarouselComponent';
 
 export function HomePage() {
   const [products, setProducts] = useState<ProductReadXML[]>([]);
@@ -23,8 +23,6 @@ export function HomePage() {
   const { language } = useLanguage();
 
   const [isResetOpen, setResetOpen] = useState(false);
-
-  // State for import products modal
   const [importProductsOpen, setImportProductsOpen] = useState(false);
 
   useEffect(() => {
@@ -72,10 +70,7 @@ export function HomePage() {
     )
   }
 
-  // Remove the handleResetData function as it's now handled by the modal
-  // Or keep it as a callback for after reset is complete:
   const handleResetComplete = () => {
-    // Refresh the product list after reset
     async function loadProducts() {
       try {
         setLoading(true);
@@ -94,8 +89,6 @@ export function HomePage() {
     loadProducts();
   };
 
-  console.log("Products : ", products); // Debug log to check product with ID 8
-
   return (
     <div className="min-h-screen bg-linear-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       <ImportProductsModalComponent open={importProductsOpen} setOpen={setImportProductsOpen} />
@@ -112,7 +105,7 @@ export function HomePage() {
             <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
               Prestashop
             </h1>
-            <p className="mt-2 t`ext-lg text-muted-foreground">
+            <p className="mt-2 text-lg text-muted-foreground">
               Discover our latest products
             </p>
           </div>
@@ -128,7 +121,6 @@ export function HomePage() {
               Reset all data
             </Button>
             <Button variant="outline" onClick={() => {
-              // Refresh the product list
               async function loadProducts() {
                 try {
                   setLoading(true);
@@ -143,12 +135,10 @@ export function HomePage() {
                   setLoading(false);
                 }
               }
-
               loadProducts();
             }}>
               Refresh
             </Button>
-
             <SelectLanguageCurrency />
           </div>
         </div>
@@ -175,11 +165,11 @@ export function HomePage() {
                 className="group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
               >
                 <div className="relative overflow-hidden bg-gray-100 dark:bg-gray-800">
-                  {product.associations.images.image && product.associations.images.image.length > 0 && product.associations.images.image[0] ? (
-                    <img
-                      src={`${product.associations.images.image[0]['@_xlink:href']}?${API_QUERY}`}
-                      alt={getWithLanguage(product.name, language.language_id)}
-                      className="h-48 w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                  {product.associations.images.image && product.associations.images.image.length > 0 ? (
+                    <ProductImageCarouselComponent
+                      images={product.associations.images.image}
+                      productName={product.name}
+                      languageId={language.language_id}
                     />
                   ) : (
                     <div className="flex h-48 items-center justify-center bg-gray-200 dark:bg-gray-700">
@@ -187,7 +177,7 @@ export function HomePage() {
                     </div>
                   )}
                   <Badge
-                    className="absolute top-2 right-2 bg-white/90 text-gray-900 hover:bg-white dark:bg-gray-900/90 dark:text-white"
+                    className="absolute top-2 right-2 z-10 bg-white/90 text-gray-900 hover:bg-white dark:bg-gray-900/90 dark:text-white"
                     variant="secondary"
                   >
                     <ShoppingCart className="mr-1 h-3 w-3" />
