@@ -14,6 +14,7 @@ export interface ProductReadXML {
     images: {
       image?: [
         {
+          id: number;
           "@_xlink:href": string;
         },
       ];
