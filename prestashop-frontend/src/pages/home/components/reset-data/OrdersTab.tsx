@@ -75,11 +75,11 @@ function OrderDetailsRow({ orderId, orderDetails, loadingDetails }: {
               </div>
               <div>
                 <span className="text-muted-foreground">Unit Price:</span>
-                <p>{getFormattedPrice(detail.product_price, language.currency, language.conversion_change, language.iso_name)}</p>
+                <p>{getFormattedPrice(detail.product_price, language.currency, language.conversion_change, language.locale)}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">TTC:</span>
-                <p>{getFormattedPrice(detail.total_price_tax_incl, language.currency, language.conversion_change, language.iso_name)}</p>
+                <p>{getFormattedPrice(detail.total_price_tax_incl, language.currency, language.conversion_change, language.locale)}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">Product ID:</span>
@@ -234,7 +234,7 @@ export function OrdersTab({ onDataLoaded, selectedIds, onSelectionChange }: Orde
                 <TableCell key={`id-${order.id}`} className="font-mono text-muted-foreground">#{order.id}</TableCell>
                 <TableCell key={`reference-${order.id}`} className="font-medium">Order #{order.reference}</TableCell>
                 <TableCell key={`total-${order.id}`} className="font-medium">
-                  {getFormattedPrice(order.total_paid, language.currency, language.conversion_change, language.iso_name)}
+                  {getFormattedPrice(order.total_paid, language.currency, language.conversion_change, language.locale)}
                 </TableCell>
               </TableRow>
               {expandedOrders.has(order.id) && (

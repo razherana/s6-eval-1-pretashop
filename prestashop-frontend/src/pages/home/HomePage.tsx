@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { ImportProductsModalComponent } from './components/ImportProductsModalComponent';
 import { ResetDataModalComponent } from './components/ResetDataModalComponent';
 import { getFormattedPrice, getWithLanguage, useLanguage } from '@/utils/lang';
+import { SelectLanguageCurrency } from '@/components/ui-manual/select-lang';
+import { Spinner } from '@/components/ui/spinner';
 
 export function HomePage() {
   const [products, setProducts] = useState<ProductReadXML[]>([]);
@@ -54,6 +56,20 @@ export function HomePage() {
         </Alert>
       </div>
     );
+  }
+
+  if (!language) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Alert variant="default">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle> Loading...</AlertTitle>
+          <AlertDescription className='flex gap-3 items-center'>
+            <Spinner />
+            Loading language settings. Please wait.</AlertDescription>
+        </Alert>
+      </div>
+    )
   }
 
   // Remove the handleResetData function as it's now handled by the modal
@@ -109,6 +125,29 @@ export function HomePage() {
             <Button variant="outline" onClick={() => setResetOpen(true)}>
               Reset all data
             </Button>
+            <Button variant="outline" onClick={() => {
+              // Refresh the product list
+              async function loadProducts() {
+                try {
+                  setLoading(true);
+                  setError(null);
+                  const data = fetchProducts(100, 0);
+                  setProducts(await data);
+                } catch (error) {
+                  console.error("Error loading products:", error);
+                  setError("Failed to load products. Please try again later.");
+                  toast.error("Failed to load products. Please try again later.");
+                } finally {
+                  setLoading(false);
+                }
+              }
+
+              loadProducts();
+            }}>
+              Refresh
+            </Button>
+
+            <SelectLanguageCurrency />
           </div>
         </div>
 
@@ -162,7 +201,7 @@ export function HomePage() {
 
                 <CardContent>
                   <p className="text-2xl font-bold text-primary">
-                    {getFormattedPrice(product.price, language.currency, language.conversion_change, language.iso_name)}
+                    {getFormattedPrice(product.price, language.currency, language.conversion_change, language.locale)}
                   </p>
                 </CardContent>
 

@@ -102,7 +102,7 @@ export function ProductsTab({ onDataLoaded, selectedIds, onSelectionChange }: Pr
               <TableCell className="font-medium">
                 {getWithLanguage(product.name, language.language_id)}
               </TableCell>
-              <TableCell>{getFormattedPrice(product.price, language.currency, language.conversion_change, language.iso_name)}</TableCell>
+              <TableCell>{getFormattedPrice(product.price, language.currency, language.conversion_change, language.locale)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

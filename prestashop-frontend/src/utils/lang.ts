@@ -4,11 +4,9 @@ export { LanguageProvider } from "@/providers/LanguageProvider";
 export { useLanguage } from "@/hooks/useLanguage";
 export type { LanguageData } from "@/contexts/LanguageContext";
 
-export const LANGUAGE_ID = 0;
+export const DATABASE_LANGUAGE_ID = localStorage.getItem("languageId") ? parseInt(localStorage.getItem("languageId") as string) : 1;
 
-export const DATABASE_LANGUAGE_ID = 1;
-
-export const DATABASE_CURRENCY_ID = 1;
+export const DATABASE_CURRENCY_ID = localStorage.getItem("currencyId") ? parseInt(localStorage.getItem("currencyId") as string) : 1;
 
 export function getWithLanguage(
   data: LanguageField,

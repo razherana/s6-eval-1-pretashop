@@ -55,6 +55,8 @@ export interface LanguageReadXML {
   id: number;
   iso_code: string;
   name: string;
+  locale: string;
+  language_code: string;
 }
 
 export interface CurrencyReadXML {
