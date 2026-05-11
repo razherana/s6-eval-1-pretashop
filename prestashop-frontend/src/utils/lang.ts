@@ -1,4 +1,4 @@
-import type { LanguageField } from "@/pages/home/types";
+import type { LanguageField } from "@/pages/backoffice/home/types";
 
 export { LanguageProvider } from "@/providers/LanguageProvider";
 export { useLanguage } from "@/hooks/useLanguage";

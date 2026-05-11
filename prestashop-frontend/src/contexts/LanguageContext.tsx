@@ -1,4 +1,4 @@
-import type { CurrencyReadXML, LanguageReadXML } from '@/pages/home/types';
+import type { CurrencyReadXML, LanguageReadXML } from '@/pages/backoffice/home/types';
 import { createContext } from 'react';
 
 export interface LanguageData {

@@ -1,5 +1,5 @@
 import { type LanguageData, type LanguageContextType, LanguageContext } from "@/contexts/LanguageContext";
-import type { CurrencyReadXML, LanguageReadXML } from "@/pages/home/types";
+import type { CurrencyReadXML, LanguageReadXML } from "@/pages/backoffice/home/types";
 import { getWithLanguage } from "@/utils/lang";
 import { fetchFromPrestashopApi } from "@/utils/url";
 import React, { useEffect, useState } from "react";

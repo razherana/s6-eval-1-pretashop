@@ -1,0 +1,11 @@
+import type { RouteObject } from "react-router-dom";
+
+export const backofficeRoutes: RouteObject[] = [
+  {
+    path: "home",
+    lazy: () =>
+      import("@/pages/backoffice/home/BackofficeHomePage.tsx").then(
+        (module) => ({ Component: module.BackofficeHomePage }),
+      ),
+  },
+];
