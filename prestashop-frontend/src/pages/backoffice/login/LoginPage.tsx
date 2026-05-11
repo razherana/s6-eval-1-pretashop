@@ -18,8 +18,8 @@ import { Label } from "@/components/ui/label";
 export function LoginPage() {
   const navigate = useNavigate();
   const { authData, login } = useBackofficeAuth();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("johndoe");
+  const [password, setPassword] = useState("password123");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {

@@ -14,8 +14,10 @@ import { getFormattedPrice, getWithLanguage, useLanguage } from '@/utils/lang';
 import { SelectLanguageCurrency } from '@/components/ui-manual/select-lang';
 import { Spinner } from '@/components/ui/spinner';
 import { ProductImageCarouselComponent } from './components/ProductImageCarouselComponent';
+import { useBackofficeAuth } from '@/hooks/useBackofficeAuth';
 
 export function BackofficeHomePage() {
+  const { logout } = useBackofficeAuth();
   const [products, setProducts] = useState<ProductReadXML[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -139,6 +141,7 @@ export function BackofficeHomePage() {
             }}>
               Refresh
             </Button>
+            <Button onClick={logout}>Log out</Button>
             <SelectLanguageCurrency />
           </div>
         </div>

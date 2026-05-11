@@ -11,8 +11,10 @@ export function BackofficeAuthProvider({
 }: BackofficeAuthProviderProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<{ id: number; name: string } | null>(() => {
-    if (localStorage.getItem("user"))
+    if (localStorage.getItem("user")) {
+      setIsAuthenticated(true);
       return JSON.parse(localStorage.getItem("user")!);
+    }
     return null;
   });
 
@@ -29,12 +31,15 @@ export function BackofficeAuthProvider({
     if (!foundUser) {
       throw new Error("Invalid username or password");
     }
-    
+
+    localStorage.setItem("user", JSON.stringify(foundUser));
     setUser(foundUser);
     setIsAuthenticated(true);
   };
 
   const logout = () => {
+
+    localStorage.removeItem("user");
     setUser(null);
     setIsAuthenticated(false);
   };

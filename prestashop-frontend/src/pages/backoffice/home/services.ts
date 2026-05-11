@@ -1,4 +1,5 @@
 import { fetchFromPrestashopApi } from "@/utils/url";
+import { parseCSV } from "@/utils/csv";
 import type {
   ProductReadXML,
   OrderReadXML,
@@ -6,6 +7,230 @@ import type {
   OrderDetailReadXML,
 } from "./types";
 import { PrestaShopXMLConverter } from "@/utils/xml";
+import productSchema from "@/schemas/product";
+
+export interface ImportedRow {
+  index: number;
+  data: Record<string, string>;
+  success: boolean;
+  error?: string;
+  warnings?: string[];
+}
+
+export interface ImportSummary {
+  step: string;
+  fileName: string;
+  totalRows: number;
+  successCount: number;
+  failedCount: number;
+  warnings: number;
+}
+
+export interface ImportResult {
+  summary: ImportSummary;
+  rows: ImportedRow[];
+}
+export interface ImportStep {
+  id: string;
+  label: string;
+  icon: "package" | "file-spreadsheet" | "file-text" | "archive";
+  acceptedFiles: string;
+  required: boolean;
+  description: string;
+}
+
+export interface FileStates {
+  products: File | null;
+  variants: File | null;
+  customers: File | null;
+  zip: File | null;
+}
+
+export interface TotalStats {
+  totalProducts: number;
+  successProducts: number;
+  failedProducts: number;
+  totalVariants: number;
+  successVariants: number;
+  failedVariants: number;
+  totalCustomers: number;
+  successCustomers: number;
+  failedCustomers: number;
+}
+
+export interface InputRefs {
+  products: React.RefObject<HTMLInputElement>;
+  variants: React.RefObject<HTMLInputElement>;
+  customers: React.RefObject<HTMLInputElement>;
+  zip: React.RefObject<HTMLInputElement>;
+}
+
+async function parseCsvFile(file: File, delimiter: string): Promise<Record<string, string>[]> {
+  const csv = await file.text();
+  return parseCSV(csv, delimiter);
+}
+
+function buildImportSummary(
+  step: string,
+  fileName: string,
+  rows: ImportedRow[],
+): ImportSummary {
+  return {
+    step,
+    fileName,
+    totalRows: rows.length,
+    successCount: rows.filter((row) => row.success).length,
+    failedCount: rows.filter((row) => !row.success).length,
+    warnings: rows.filter((row) => row.warnings && row.warnings.length > 0).length,
+  };
+}
+
+function validateRequiredFields(
+  row: Record<string, string>,
+  requiredFields: string[],
+): string | true {
+  for (const field of requiredFields) {
+    const value = row[field];
+
+    if (field.endsWith(";")) {
+      const hasMatchingHeader = Object.keys(row).some((header) =>
+        header.startsWith(field),
+      );
+
+      if (!hasMatchingHeader) {
+        return field;
+      }
+
+      continue;
+    }
+
+    if (!value || value.trim() === "") {
+      return field;
+    }
+  }
+
+  return true;
+}
+
+export async function importProductsFromFile(file: File, delimiter: string): Promise<ImportResult> {
+  const parsedRows = await parseCsvFile(file, delimiter);
+  const converter = new PrestaShopXMLConverter(productSchema, "");
+
+  const rows: ImportedRow[] = [];
+
+  for (const [index, row] of parsedRows.entries()) {
+    const headers = Object.keys(row);
+    const validation = verifyProductData(row, headers);
+
+    if (validation !== true) {
+      rows.push({
+        index: index + 1,
+        data: row,
+        success: false,
+        error: `Missing required field: ${validation}`,
+      });
+      continue;
+    }
+
+    try {
+      await createProduct(row, converter);
+      rows.push({
+        index: index + 1,
+        data: row,
+        success: true,
+      });
+    } catch (error) {
+      rows.push({
+        index: index + 1,
+        data: row,
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to create product",
+      });
+    }
+  }
+
+  return {
+    summary: buildImportSummary("Products", file.name, rows),
+    rows,
+  };
+}
+
+export async function importVariantsFromFile(file: File, delimiter: string): Promise<ImportResult> {
+  const parsedRows = await parseCsvFile(file, delimiter);
+  const requiredFields = [
+    "reference",
+    "specificité",
+    "karazany",
+    "stock_initial",
+    "prix_vente_ttc",
+  ];
+
+  const rows: ImportedRow[] = parsedRows.map((row, index) => {
+    const validation = validateRequiredFields(row, requiredFields);
+
+    if (validation !== true) {
+      return {
+        index: index + 1,
+        data: row,
+        success: false,
+        error: `Missing required field: ${validation}`,
+      };
+    }
+
+    return {
+      index: index + 1,
+      data: row,
+      success: true,
+    };
+  });
+
+  return {
+    summary: buildImportSummary("Variants", file.name, rows),
+    rows,
+  };
+}
+
+export async function importCustomersFromFile(file: File, delimiter: string): Promise<ImportResult> {
+  const parsedRows = await parseCsvFile(file, delimiter);
+  const requiredFields = ["date", "nom", "email", "pwd", "adresse", "achat", "etat"];
+
+  const rows: ImportedRow[] = parsedRows.map((row, index) => {
+    const validation = validateRequiredFields(row, requiredFields);
+
+    if (validation !== true) {
+      return {
+        index: index + 1,
+        data: row,
+        success: false,
+        error: `Missing required field: ${validation}`,
+      };
+    }
+
+    return {
+      index: index + 1,
+      data: row,
+      success: true,
+    };
+  });
+
+  return {
+    summary: buildImportSummary("Customers", file.name, rows),
+    rows,
+  };
+}
+
+export async function summarizeZipArchive(file: File): Promise<ImportSummary> {
+  return {
+    step: "Images Archive",
+    fileName: file.name,
+    totalRows: 1,
+    successCount: 1,
+    failedCount: 0,
+    warnings: 0,
+  };
+}
+
+// --- Others
 
 export async function fetchProducts(
   limit: number,
@@ -243,3 +468,4 @@ export async function resetCustomers(customerIds: number[]): Promise<{
 
   return { deletedCustomerIds, failedCustomerIds };
 }
+

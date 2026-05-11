@@ -68,3 +68,9 @@ export interface CurrencyReadXML {
   symbol: LanguageField;
   names: LanguageField;
 }
+
+export interface CategoryReadXML {
+  id: number;
+  name: LanguageField;
+  id_parent: number;
+}
