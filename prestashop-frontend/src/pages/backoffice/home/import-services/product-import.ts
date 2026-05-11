@@ -344,17 +344,19 @@ export async function importProductsFromFile(
   for (const [index, row] of parsedRows.entries()) {
     try {
       const cleanTax = row.Taxe
-        ? numeral(row.Taxe.replace("%", "").trim()).value().toString()
+        ? numeral(row.Taxe.replace("%", "").trim()).value().toFixed(2)
         : "0";
 
       // Map CSV fields to schema fields
       const productData: Record<string, string> = {
         ...row,
         wholesale_price: numeral(row.prix_achat || "0")
-          .value().toFixed(2),
-        price: numeral(row.prix_ttc || "0")
-          .divide(+cleanTax / 100 + 1)
-          .value().toFixed(2),
+          .value()
+          .toFixed(2),
+        price: (
+          numeral(row.prix_ttc || "0").value() /
+          (1 + (taxMap[cleanTax]?.taxId ? parseFloat(cleanTax) / 100 : 0))
+        ).toFixed(2),
         reference: row.reference || "",
         state: "1",
         active: "1",

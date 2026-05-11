@@ -4,6 +4,13 @@ import type { XMLBuilder } from "xmlbuilder2/lib/interfaces";
 
 const parser = new XMLParser({
   ignoreAttributes: false,
+  attributeValueProcessor: (attrName, attrValue, _jPath) => {
+    // List the attributes you want to ignore
+    const forbidden = ["xlink:href"];
+    if (forbidden.includes(attrName)) 
+      return undefined; // Returning undefined effectively ignores it
+    return attrValue;
+  },
 });
 
 export function readXml<T = unknown>(xmlString: string): T {
@@ -373,7 +380,7 @@ export class PrestaShopXMLConverter {
         );
       }
     }
-    
+
     if (Object.keys(this.schema.associations).length > 0) {
       // 3. Process associations
       const associations = product.ele("associations");

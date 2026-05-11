@@ -4,6 +4,9 @@ import {
   type ImportResult,
   type ImportedRow,
   buildImportSummary,
+  fetchProducts,
+  fetchTaxRules,
+  fetchTaxes,
   parseCsvFile,
 } from "../services";
 import numeral from "numeral";
@@ -11,6 +14,7 @@ import { productOptionSchema } from "@/schemas/product-option";
 import { productOptionValueSchema } from "@/schemas/product-option-value";
 import { combinationSchema } from "@/schemas/combination";
 import { stockAvailableSchema } from "@/schemas/stock-available";
+import type { TaxReadXML } from "../types";
 
 interface ProductReferenceMap {
   [reference: string]: number; // product reference -> product ID
@@ -26,11 +30,92 @@ interface AttributeValueMap {
   };
 }
 
+// Add these caches at the top of the file or inside the import function
+interface ProductInfoCache {
+  [productId: number]: {
+    taxRate: number;
+    basePrice: number;
+  };
+}
+
+async function getProductInfo(
+  productId: number,
+  cache: ProductInfoCache,
+): Promise<{ taxRate: number; basePrice: number }> {
+  if (cache[productId]) {
+    return cache[productId];
+  }
+
+  try {
+    const response = await fetchFromPrestashopApi<{
+      product: {
+        id_tax_rules_group: string | { "#text": string };
+        price: string;
+      };
+    }>(`/products/${productId}?display=[id_tax_rules_group,price]`, {
+      method: "GET",
+    });
+
+    const basePrice = parseFloat(response.product.price);
+
+    const taxRulesGroupId =
+      typeof response.product.id_tax_rules_group === "object"
+        ? parseInt(response.product.id_tax_rules_group["#text"])
+        : parseInt(response.product.id_tax_rules_group);
+
+    let taxRate = 0;
+
+    if (taxRulesGroupId && taxRulesGroupId > 0) {
+      const taxRulesResponse = await fetchFromPrestashopApi<{
+        tax_rules: {
+          tax_rule: Array<{
+            id_tax: string | { "#text": string };
+          }>;
+        };
+      }>(
+        `/tax_rules?display=[id_tax]&filter[id_tax_rules_group]=${taxRulesGroupId}`,
+        { method: "GET" },
+      );
+
+      const taxRules = taxRulesResponse.tax_rules.tax_rule;
+      const taxRulesArray = Array.isArray(taxRules) ? taxRules : [taxRules];
+
+      if (taxRulesArray.length > 0) {
+        const taxId =
+          typeof taxRulesArray[0].id_tax === "object"
+            ? parseInt(taxRulesArray[0].id_tax["#text"])
+            : parseInt(taxRulesArray[0].id_tax);
+
+        const taxResponse = await fetchFromPrestashopApi<{
+          tax: { rate: string };
+        }>(`/taxes/${taxId}?display=[rate]`, { method: "GET" });
+
+        taxRate = parseFloat(taxResponse.tax.rate);
+      }
+    }
+
+    cache[productId] = { taxRate, basePrice };
+    return { taxRate, basePrice };
+  } catch (error) {
+    console.error(`Error fetching info for product ${productId}:`, error);
+    return { taxRate: 0, basePrice: 0 };
+  }
+}
+
 async function fetchAllProducts(): Promise<ProductReferenceMap> {
   try {
     const response = await fetchFromPrestashopApi<{
-      products: { product: Array<{ id: string; reference: string }> };
-    }>("/products?display=[id,reference]", { method: "GET" });
+      products: {
+        product: Array<{
+          id: string;
+          reference: string;
+          id_tax_rules_group: string;
+          price: string;
+        }>;
+      };
+    }>("/products?display=[id,reference,id_tax_rules_group,price]", {
+      method: "GET",
+    });
 
     const products = Array.isArray(response.products.product)
       ? response.products.product
@@ -61,10 +146,9 @@ async function fetchStockAvailablesForProduct(
           id_product_attribute: string | { "#text": string };
         }>;
       };
-    }>(
-      `/stock_availables?display=full&filter[id_product]=${productId}`,
-      { method: "GET" },
-    );
+    }>(`/stock_availables?display=full&filter[id_product]=${productId}`, {
+      method: "GET",
+    });
 
     const stockAvailables = response.stock_availables.stock_available;
     const stockArray = Array.isArray(stockAvailables)
@@ -210,8 +294,8 @@ async function ensureAttributeGroupsExist(
           { method: "GET" },
         );
 
-        const existingValues = valuesResponse.product_option_values
-          .product_option_value;
+        const existingValues =
+          valuesResponse.product_option_values.product_option_value;
         const valuesArray = Array.isArray(existingValues)
           ? existingValues
           : [existingValues];
@@ -225,10 +309,7 @@ async function ensureAttributeGroupsExist(
           }
         }
       } catch (error) {
-        console.warn(
-          `Could not fetch values for group "${groupName}":`,
-          error,
-        );
+        console.warn(`Could not fetch values for group "${groupName}":`, error);
       }
     }
   }
@@ -276,6 +357,7 @@ async function createCombination(
   attributeValueIds: number[],
   price: string | undefined,
   reference: string,
+  productInfoCache: ProductInfoCache,
 ): Promise<number> {
   const converter = new PrestaShopXMLConverter(combinationSchema, "");
 
@@ -289,11 +371,25 @@ async function createCombination(
   };
 
   if (price && price.trim()) {
-    const priceNum = numeral(price).value();
-    if (priceNum !== null && !isNaN(priceNum)) {
-      // The price in combination is the impact on the base price
-      // If the variant has a different total price, calculate the difference
-      data.price = priceNum.toString();
+    const prixVenteTtc = numeral(price).value();
+    if (prixVenteTtc !== null && !isNaN(prixVenteTtc)) {
+      // Get product info from cache
+      const { taxRate, basePrice } = await getProductInfo(
+        productId,
+        productInfoCache,
+      );
+
+      console.log(
+        `Calculating price impact for product ${productId}: prixVenteTtc=${prixVenteTtc}, taxRate=${taxRate}, basePrice=${basePrice}`,
+      );
+
+      const priceImpact = prixVenteTtc / (1 + taxRate / 100) - basePrice;
+
+      console.log(
+        `Calculated price impact for combination: ${priceImpact.toFixed(6)}`,
+      );
+
+      data.price = priceImpact.toFixed(6);
     }
   }
 
@@ -440,6 +536,47 @@ export async function importVariantsFromFile(
     const productMap = await fetchAllProducts();
     console.log("Product reference map:", productMap);
 
+    const allProductsDisplayFull = await fetchProducts(100, 0);
+    const allTaxRules = await fetchTaxRules(100, 0);
+    const allTaxes = new Map<number, TaxReadXML>(
+      (await fetchTaxes(100, 0)).map((tax) => [tax.id, tax]),
+    );
+
+    const taxRuleGroupMap: Map<
+      number,
+      {
+        taxRate: number;
+      }
+    > = new Map();
+
+    for (const taxRule of allTaxRules) {
+      const taxRate = taxRule.id_tax ? allTaxes.get(taxRule.id_tax).rate : 0;
+      
+      taxRuleGroupMap.set(taxRule.id_tax_rules_group["#text"], {
+        taxRate,
+      });
+    }
+
+    console.log("Tax rule group map:", taxRuleGroupMap);
+
+    const productInfoCache: ProductInfoCache = {};
+    for (const product of allProductsDisplayFull) {
+      productInfoCache[product.id] = {
+        taxRate: parseFloat(
+          product.id_tax_rules_group
+            ? taxRuleGroupMap
+                .get(+product.id_tax_rules_group["#text"])
+                ?.taxRate.toFixed(2) || "0"
+            : "0",
+        ),
+        basePrice: parseFloat(product.price.toFixed(2)),
+      };
+
+      console.log(
+        `Caching info for product ${product.id} (reference: ${product.reference}) : taxRate=${productInfoCache[product.id].taxRate}, basePrice=${productInfoCache[product.id].basePrice}`,
+      );
+    }
+
     // Step 2: Ensure all attribute groups and values exist
     const { attributeGroupMap, attributeValueMap } =
       await ensureAttributeGroupsExist(
@@ -454,9 +591,12 @@ export async function importVariantsFromFile(
 
     // Step 3: Process each variant row
     const rows: ImportedRow[] = [];
-    
+
     // Cache stock available IDs by product
-    const stockAvailableCache: Record<number, { [combinationId: number]: number }> = {};
+    const stockAvailableCache: Record<
+      number,
+      { [combinationId: number]: number }
+    > = {};
 
     for (const [index, row] of parsedRows.entries()) {
       const reference = row.reference;
@@ -502,7 +642,7 @@ export async function importVariantsFromFile(
             stockAvailableCache[productId],
           );
           await updateStockAvailable(stockAvailableId, stockInitial);
-          
+
           rows.push({
             index: index + 1,
             data: row,
@@ -515,9 +655,7 @@ export async function importVariantsFromFile(
             data: row,
             success: false,
             error:
-              error instanceof Error
-                ? error.message
-                : "Failed to update stock",
+              error instanceof Error ? error.message : "Failed to update stock",
           });
         }
         continue;
@@ -559,6 +697,7 @@ export async function importVariantsFromFile(
           attributeValueIds,
           prixVenteTtc,
           reference,
+          productInfoCache,
         );
 
         // Now fetch the stock_available ID that was auto-created

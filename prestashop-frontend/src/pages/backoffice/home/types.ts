@@ -22,6 +22,11 @@ export interface ProductReadXML {
   };
   price: number;
   reference: string;
+  id_tax_rules_group:
+    | {
+        "#text": number;
+      }
+    | "";
 }
 
 export interface OrderReadXML {
@@ -72,7 +77,33 @@ export interface CurrencyReadXML {
 export interface CategoryReadXML {
   id: number;
   name: LanguageField;
-  id_parent: 0 | {
+  id_parent:
+    | 0
+    | {
+        "#text": number;
+      };
+}
+
+export interface TaxReadXML {
+  id: number;
+  rate: number;
+  active: string;
+  deleted: string;
+  name: LanguageField;
+}
+
+export interface TaxRuleGroupReadXML {
+  id: number;
+  name: string;
+  active: string;
+}
+
+export interface TaxRuleReadXML {
+  id: number;
+  id_tax_rules_group: {
     "#text": number;
   };
+  id_country: string;
+  id_tax: number;
+  behavior: string;
 }

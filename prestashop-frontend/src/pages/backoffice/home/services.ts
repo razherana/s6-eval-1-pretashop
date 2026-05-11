@@ -6,6 +6,9 @@ import type {
   CustomerReadXML,
   CategoryReadXML,
   OrderDetailReadXML,
+  TaxReadXML,
+  TaxRuleGroupReadXML,
+  TaxRuleReadXML,
 } from "./types";
 import { PrestaShopXMLConverter } from "@/utils/xml";
 
@@ -502,4 +505,154 @@ export async function resetCategories(categoryIds: number[]): Promise<{
   }
 
   return { deletedCategoryIds, failedCategoryIds };
+}
+
+export async function fetchTaxes(
+  limit: number = 100,
+  offset: number = 0,
+): Promise<TaxReadXML[]> {
+  const query = new URLSearchParams({
+    display: "full",
+    limit: limit.toString(),
+    offset: offset.toString(),
+  });
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await fetchFromPrestashopApi<any>(
+      `/taxes?${query.toString()}`,
+      { method: "GET" },
+    );
+
+    if (response.taxes.tax) {
+      return Array.isArray(response.taxes.tax)
+        ? response.taxes.tax
+        : [response.taxes.tax];
+    }
+    return [];
+  } catch (error) {
+    console.error("Error fetching taxes:", error);
+    throw error;
+  }
+}
+
+export async function fetchTaxRuleGroups(
+  limit: number = 100,
+  offset: number = 0,
+): Promise<TaxRuleGroupReadXML[]> {
+  const query = new URLSearchParams({
+    display: "full",
+    limit: limit.toString(),
+    offset: offset.toString(),
+  });
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await fetchFromPrestashopApi<any>(
+      `/tax_rule_groups?${query.toString()}`,
+      { method: "GET" },
+    );
+
+    if (response.tax_rule_groups.tax_rule_group) {
+      return Array.isArray(response.tax_rule_groups.tax_rule_group)
+        ? response.tax_rule_groups.tax_rule_group
+        : [response.tax_rule_groups.tax_rule_group];
+    }
+    return [];
+  } catch (error) {
+    console.error("Error fetching tax rule groups:", error);
+    throw error;
+  }
+}
+
+export async function fetchTaxRules(
+  limit: number = 100,
+  offset: number = 0,
+): Promise<TaxRuleReadXML[]> {
+  const query = new URLSearchParams({
+    display: "full",
+    limit: limit.toString(),
+    offset: offset.toString(),
+  });
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await fetchFromPrestashopApi<any>(
+      `/tax_rules?${query.toString()}`,
+      { method: "GET" },
+    );
+
+    if (response.tax_rules.tax_rule) {
+      return Array.isArray(response.tax_rules.tax_rule)
+        ? response.tax_rules.tax_rule
+        : [response.tax_rules.tax_rule];
+    }
+    return [];
+  } catch (error) {
+    console.error("Error fetching tax rules:", error);
+    throw error;
+  }
+}
+
+export async function resetTaxes(taxIds: number[]): Promise<{
+  deletedTaxIds: number[];
+  failedTaxIds: number[];
+}> {
+  const deletedTaxIds: number[] = [];
+  const failedTaxIds: number[] = [];
+
+  for (const id of taxIds) {
+    try {
+      await fetchFromPrestashopApi(`/taxes/${id}`, { method: "DELETE" });
+      console.log(`Deleted tax with ID: ${id}`);
+      deletedTaxIds.push(id);
+    } catch (error) {
+      console.error("Error deleting tax:", error);
+      failedTaxIds.push(id);
+    }
+  }
+
+  return { deletedTaxIds, failedTaxIds };
+}
+
+export async function resetTaxRuleGroups(taxRuleGroupIds: number[]): Promise<{
+  deletedTaxRuleGroupIds: number[];
+  failedTaxRuleGroupIds: number[];
+}> {
+  const deletedTaxRuleGroupIds: number[] = [];
+  const failedTaxRuleGroupIds: number[] = [];
+
+  for (const id of taxRuleGroupIds) {
+    try {
+      await fetchFromPrestashopApi(`/tax_rule_groups/${id}`, { method: "DELETE" });
+      console.log(`Deleted tax rule group with ID: ${id}`);
+      deletedTaxRuleGroupIds.push(id);
+    } catch (error) {
+      console.error("Error deleting tax rule group:", error);
+      failedTaxRuleGroupIds.push(id);
+    }
+  }
+
+  return { deletedTaxRuleGroupIds, failedTaxRuleGroupIds };
+}
+
+export async function resetTaxRules(taxRuleIds: number[]): Promise<{
+  deletedTaxRuleIds: number[];
+  failedTaxRuleIds: number[];
+}> {
+  const deletedTaxRuleIds: number[] = [];
+  const failedTaxRuleIds: number[] = [];
+
+  for (const id of taxRuleIds) {
+    try {
+      await fetchFromPrestashopApi(`/tax_rules/${id}`, { method: "DELETE" });
+      console.log(`Deleted tax rule with ID: ${id}`);
+      deletedTaxRuleIds.push(id);
+    } catch (error) {
+      console.error("Error deleting tax rule:", error);
+      failedTaxRuleIds.push(id);
+    }
+  }
+
+  return { deletedTaxRuleIds, failedTaxRuleIds };
 }

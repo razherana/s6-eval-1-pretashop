@@ -1,4 +1,4 @@
-import type { ProductReadXML, OrderReadXML, CustomerReadXML, CategoryReadXML } from "../../types";
+import type { ProductReadXML, OrderReadXML, CustomerReadXML, CategoryReadXML, TaxReadXML, TaxRuleGroupReadXML, TaxRuleReadXML } from "../../types";
 import type { DataItem, ResetType } from "../ResetDataModalComponent";
 
 export const getItemName = (item: DataItem, type: ResetType): string => {
@@ -18,6 +18,18 @@ export const getItemName = (item: DataItem, type: ResetType): string => {
     case 'categories': {
       const category = item as CategoryReadXML;
       return category.name.language[0]?.['#text'] || 'Unnamed Category';
+    }
+    case 'taxes': {
+      const tax = item as TaxReadXML;
+      return tax.name?.language?.[0]?.['#text'] || `Tax ${tax.id}`;
+    }
+    case 'tax_rule_groups': {
+      const group = item as TaxRuleGroupReadXML;
+      return group.name || `Tax Rule Group ${group.id}`;
+    }
+    case 'tax_rules': {
+      const rule = item as TaxRuleReadXML;
+      return `Tax Rule ${rule.id}`;
     }
   }
 };
