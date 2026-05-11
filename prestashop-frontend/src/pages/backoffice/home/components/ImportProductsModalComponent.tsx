@@ -1,7 +1,6 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import React, { useState, useRef } from "react";
 import {
-  importCustomersFromFile,
   summarizeZipArchive,
   type ImportSummary,
   type ImportedRow,
@@ -9,6 +8,7 @@ import {
 
 import { importProductsFromFile } from "../import-services/product-import";
 import { importVariantsFromFile } from "../import-services/variant-import";
+import { importCustomersFromFile } from "../import-services/customer-import";
 
 import { ImportConfigurationView } from "./import-data/ImportConfigurationView";
 import { ImportResultsView } from "./import-data/ImportResultsView";
@@ -232,20 +232,48 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
       throw error;
     }
 
-    throw new Error("Simulated error after products import");
-
     // Step 3: Customers
     setCurrentStep(2);
     setCurrentFileProgress(0);
-    for (let i = 0; i <= 100; i += 15) {
-      await new Promise(resolve => setTimeout(resolve, 60));
-      setCurrentFileProgress(i);
-      setProgress(50 + 25 * (i / 100));
+
+    const customersImportPromise = importCustomersFromFile(
+      fileStates.customers!,
+      delimiter,
+      decimalSeparator,
+      languageIds
+    );
+
+    let customersProgressInterval: NodeJS.Timeout | null = null;
+    let customersSummary: ImportSummary;
+
+    try {
+      customersProgressInterval = setInterval(() => {
+        setCurrentFileProgress(prev => {
+          const newProgress = prev + Math.random() * 15;
+          return newProgress >= 90 ? 90 : newProgress;
+        });
+        setProgress(prev => {
+          const newProgress = prev + Math.random() * 2;
+          return newProgress >= 73 ? 73 : newProgress;
+        });
+      }, 200);
+
+      const customersImport = await customersImportPromise;
+
+      if (customersProgressInterval) clearInterval(customersProgressInterval);
+      setCurrentFileProgress(100);
+      setProgress(75);
+
+      setCustomersResults(customersImport.rows);
+      customersSummary = customersImport.summary;
+      summaries.push(customersSummary);
+    } catch (error) {
+      if (customersProgressInterval) clearInterval(customersProgressInterval);
+      console.error(error);
+      throw error;
     }
-    const customersImport = await importCustomersFromFile(fileStates.customers!, delimiter, decimalSeparator);
-    setCustomersResults(customersImport.rows);
-    const customersSummary = customersImport.summary;
-    summaries.push(customersSummary);
+    
+    throw new Error("Simulated error after products import");
 
     // Step 4: ZIP Processing
     setCurrentStep(3);
