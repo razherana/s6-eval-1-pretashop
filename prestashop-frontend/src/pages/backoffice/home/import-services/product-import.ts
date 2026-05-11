@@ -343,15 +343,18 @@ export async function importProductsFromFile(
   // Step 4: Process each product
   for (const [index, row] of parsedRows.entries()) {
     try {
+      const cleanTax = row.Taxe
+        ? numeral(row.Taxe.replace("%", "").trim()).value().toString()
+        : "0";
+
       // Map CSV fields to schema fields
       const productData: Record<string, string> = {
         ...row,
         wholesale_price: numeral(row.prix_achat || "0")
-          .value()
-          .toString(),
+          .value().toFixed(2),
         price: numeral(row.prix_ttc || "0")
-          .value()
-          .toString(),
+          .divide(+cleanTax / 100 + 1)
+          .value().toFixed(2),
         reference: row.reference || "",
         state: "1",
         active: "1",
@@ -377,9 +380,6 @@ export async function importProductsFromFile(
 
       // Set tax
       if (row.Taxe) {
-        const cleanTax = numeral(row.Taxe.replace("%", "").trim())
-          .value()
-          .toString();
         if (taxMap[cleanTax]) {
           productData.id_tax_rules_group =
             taxMap[cleanTax].taxRuleGroupId.toString();

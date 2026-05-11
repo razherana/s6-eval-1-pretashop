@@ -227,7 +227,12 @@ export async function fetchCategories(
       { method: "GET" },
     );
 
-    return response.categories.category;
+    if (response.categories.category) {
+      return Array.isArray(response.categories.category)
+        ? response.categories.category
+        : [response.categories.category];
+    }
+    return [];
   } catch (error) {
     console.error("Error fetching categories:", error);
     throw error;
@@ -337,7 +342,12 @@ export async function fetchCustomers(
       { method: "GET" },
     );
 
-    return response.customers.customer;
+    if (response.customers.customer) {
+      return Array.isArray(response.customers.customer)
+        ? response.customers.customer
+        : [response.customers.customer];
+    }
+    return [];
   } catch (error) {
     console.error("Error fetching customers:", error);
     throw error;
@@ -493,4 +503,3 @@ export async function resetCategories(categoryIds: number[]): Promise<{
 
   return { deletedCategoryIds, failedCategoryIds };
 }
-
