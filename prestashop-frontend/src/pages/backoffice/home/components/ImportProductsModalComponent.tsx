@@ -1,19 +1,19 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import React, { useState, useRef } from "react";
 import {
-  summarizeZipArchive,
-  type ImportSummary,
   type ImportedRow,
 } from "../services";
 
 import { importProductsFromFile } from "../import-services/product-import";
 import { importVariantsFromFile } from "../import-services/variant-import";
 import { importCustomersFromFile } from "../import-services/customer-import";
+import { importImagesFromZip } from "../import-services/zip-import";
 
 import { ImportConfigurationView } from "./import-data/ImportConfigurationView";
 import { ImportResultsView } from "./import-data/ImportResultsView";
 import { type ImportStep, type FileStates, type TotalStats } from "../services";
 import { useLanguage } from "@/utils/lang";
+import { toast } from "sonner";
 
 export function ImportProductsModalComponent({ open, setOpen }: { open: boolean, setOpen: React.Dispatch<React.SetStateAction<boolean>> }) {
   // File states
@@ -52,15 +52,16 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
     totalCustomers: 0,
     successCustomers: 0,
     failedCustomers: 0,
-    totalCategories: 0,
-    successCategories: 0,
-    failedCategories: 0,
+    totalImages: 0,
+    successImages: 0,
+    failedImages: 0,
   });
 
   // Results data
   const [productsResults, setProductsResults] = useState<ImportedRow[]>([]);
   const [variantsResults, setVariantsResults] = useState<ImportedRow[]>([]);
   const [customersResults, setCustomersResults] = useState<ImportedRow[]>([]);
+  const [imagesResults, setImagesResults] = useState<ImportedRow[]>([]);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -147,162 +148,130 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
     setProgress(0);
     setImportComplete(false);
 
-    const summaries: ImportSummary[] = [];
-
-    // Get language IDs from context
     const languageIds = language.rawLanguages?.map(l => l.id) || [1, 2, 3];
 
-    // Step 1: Products
-    setCurrentStep(0);
-    setCurrentFileProgress(0);
-
-    // Start the import and update progress simultaneously
-    const productsImportPromise = importProductsFromFile(fileStates.products!, delimiter, decimalSeparator, languageIds);
-
-    // Animate progress while waiting
-    let progressInterval: NodeJS.Timeout | null = null;
-    let productsSummary: ImportSummary;
-
     try {
-      progressInterval = setInterval(() => {
-        setCurrentFileProgress(prev => {
-          const newProgress = prev + Math.random() * 15;
-          return newProgress >= 90 ? 90 : newProgress; // Cap at 90% until complete
-        });
-        setProgress(prev => {
-          const newProgress = prev + Math.random() * 2;
-          return newProgress >= 22 ? 22 : newProgress; // Cap at 22% for first step
-        });
+      // Step 1: Products
+      setCurrentStep(0);
+      setCurrentFileProgress(0);
+
+      const productsImportPromise = importProductsFromFile(
+        fileStates.products!,
+        delimiter,
+        decimalSeparator,
+        languageIds
+      );
+
+      let progressInterval = setInterval(() => {
+        setCurrentFileProgress(prev => Math.min(prev + Math.random() * 15, 90));
+        setProgress(prev => Math.min(prev + Math.random() * 2, 22));
       }, 200);
 
       const productsImport = await productsImportPromise;
-
-      // Clear interval and set to 100%
-      if (progressInterval) clearInterval(progressInterval);
+      clearInterval(progressInterval);
       setCurrentFileProgress(100);
       setProgress(25);
-
       setProductsResults(productsImport.rows);
-      productsSummary = productsImport.summary;
-      summaries.push(productsSummary);
-    } catch (error) {
-      if (progressInterval) clearInterval(progressInterval);
-      console.error(error);
-      throw error;
-    }
 
-    // Step 2: Variants
-    setCurrentStep(1);
-    setCurrentFileProgress(0);
+      // Step 2: Variants
+      setCurrentStep(1);
+      setCurrentFileProgress(0);
 
-    const variantsImportPromise = importVariantsFromFile(
-      fileStates.variants!,
-      delimiter,
-      decimalSeparator,
-      languageIds
-    );
+      const variantsImportPromise = importVariantsFromFile(
+        fileStates.variants!,
+        delimiter,
+        decimalSeparator,
+        languageIds
+      );
 
-    let variantsProgressInterval: NodeJS.Timeout | null = null;
-    let variantsSummary: ImportSummary;
-
-    try {
-      variantsProgressInterval = setInterval(() => {
-        setCurrentFileProgress(prev => {
-          const newProgress = prev + Math.random() * 15;
-          return newProgress >= 90 ? 90 : newProgress;
-        });
-        setProgress(prev => {
-          const newProgress = prev + Math.random() * 2;
-          return newProgress >= 48 ? 48 : newProgress;
-        });
+      progressInterval = setInterval(() => {
+        setCurrentFileProgress(prev => Math.min(prev + Math.random() * 15, 90));
+        setProgress(prev => Math.min(prev + Math.random() * 2, 48));
       }, 200);
 
       const variantsImport = await variantsImportPromise;
-
-      if (variantsProgressInterval) clearInterval(variantsProgressInterval);
+      clearInterval(progressInterval);
       setCurrentFileProgress(100);
       setProgress(50);
-
       setVariantsResults(variantsImport.rows);
-      variantsSummary = variantsImport.summary;
-      summaries.push(variantsSummary);
-    } catch (error) {
-      if (variantsProgressInterval) clearInterval(variantsProgressInterval);
-      console.error(error);
-      throw error;
-    }
 
-    // Step 3: Customers
-    setCurrentStep(2);
-    setCurrentFileProgress(0);
+      // Step 3: Customers
+      setCurrentStep(2);
+      setCurrentFileProgress(0);
 
-    const customersImportPromise = importCustomersFromFile(
-      fileStates.customers!,
-      delimiter,
-      decimalSeparator,
-      languageIds
-    );
+      const customersImportPromise = importCustomersFromFile(
+        fileStates.customers!,
+        delimiter,
+        decimalSeparator,
+        languageIds
+      );
 
-    let customersProgressInterval: NodeJS.Timeout | null = null;
-    let customersSummary: ImportSummary;
-
-    try {
-      customersProgressInterval = setInterval(() => {
-        setCurrentFileProgress(prev => {
-          const newProgress = prev + Math.random() * 15;
-          return newProgress >= 90 ? 90 : newProgress;
-        });
-        setProgress(prev => {
-          const newProgress = prev + Math.random() * 2;
-          return newProgress >= 73 ? 73 : newProgress;
-        });
+      progressInterval = setInterval(() => {
+        setCurrentFileProgress(prev => Math.min(prev + Math.random() * 15, 90));
+        setProgress(prev => Math.min(prev + Math.random() * 2, 73));
       }, 200);
 
       const customersImport = await customersImportPromise;
-
-      if (customersProgressInterval) clearInterval(customersProgressInterval);
+      clearInterval(progressInterval);
       setCurrentFileProgress(100);
       setProgress(75);
-
       setCustomersResults(customersImport.rows);
-      customersSummary = customersImport.summary;
-      summaries.push(customersSummary);
+
+      // Step 4: ZIP Image Processing
+      setCurrentStep(3);
+      setCurrentFileProgress(0);
+
+      const imagesResult = await importImagesFromZip(
+        fileStates.zip!,
+        (zipProgress) => {
+          setCurrentFileProgress(zipProgress);
+          setProgress(75 + (25 * zipProgress) / 100);
+        }
+      );
+
+      setImagesResults(imagesResult.rows);
+
+      setTotalStats({
+        totalProducts: productsImport.summary.totalRows,
+        successProducts: productsImport.summary.successCount,
+        failedProducts: productsImport.summary.failedCount,
+        totalVariants: variantsImport.summary.totalRows,
+        successVariants: variantsImport.summary.successCount,
+        failedVariants: variantsImport.summary.failedCount,
+        totalCustomers: customersImport.summary.totalRows,
+        successCustomers: customersImport.summary.successCount,
+        failedCustomers: customersImport.summary.failedCount,
+        totalImages: imagesResult.summary.totalRows,
+        successImages: imagesResult.summary.successCount,
+        failedImages: imagesResult.summary.failedCount,
+      });
+
+      setProgress(100);
+      setIsImporting(false);
+      setImportComplete(true);
+
+      // Show success/error toasts
+      const totalSuccess = productsImport.summary.successCount +
+        variantsImport.summary.successCount +
+        customersImport.summary.successCount +
+        imagesResult.summary.successCount;
+      const totalFailed = productsImport.summary.failedCount +
+        variantsImport.summary.failedCount +
+        customersImport.summary.failedCount +
+        imagesResult.summary.failedCount;
+
+      if (totalFailed === 0) {
+        toast.success(`Import complete! ${totalSuccess} items processed successfully`);
+      } else {
+        toast.warning(`Import complete with ${totalFailed} errors`);
+      }
+
     } catch (error) {
-      if (customersProgressInterval) clearInterval(customersProgressInterval);
-      console.error(error);
-      throw error;
+      console.error("Import error:", error);
+      toast.error("Import failed: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      setIsImporting(false);
     }
-    
-    throw new Error("Simulated error after products import");
-
-    // Step 4: ZIP Processing
-    setCurrentStep(3);
-    setCurrentFileProgress(0);
-    for (let i = 0; i <= 100; i += 5) {
-      await new Promise(resolve => setTimeout(resolve, 50));
-      setCurrentFileProgress(i);
-      setProgress(75 + 25 * (i / 100));
-    }
-    summaries.push(await summarizeZipArchive(fileStates.zip!));
-
-    setTotalStats({
-      totalProducts: productsSummary.totalRows,
-      successProducts: productsSummary.successCount,
-      failedProducts: productsSummary.failedCount,
-      totalVariants: variantsSummary.totalRows,
-      successVariants: variantsSummary.successCount,
-      failedVariants: variantsSummary.failedCount,
-      totalCustomers: customersSummary.totalRows,
-      successCustomers: customersSummary.successCount,
-      failedCustomers: customersSummary.failedCount,
-      totalCategories: 0,
-      successCategories: 0,
-      failedCategories: 0,
-    });
-
-    setProgress(100);
-    setIsImporting(false);
-    setImportComplete(true);
   };
 
   const handleReset = () => {
@@ -315,6 +284,7 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
     setProductsResults([]);
     setVariantsResults([]);
     setCustomersResults([]);
+    setImagesResults([]);
     setCurrentPage(1);
   };
 
@@ -334,6 +304,7 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
             productsResults={productsResults}
             variantsResults={variantsResults}
             customersResults={customersResults}
+            imagesResults={imagesResults}
             totalStats={totalStats}
             currentPage={currentPage}
             setCurrentPage={setCurrentPage}

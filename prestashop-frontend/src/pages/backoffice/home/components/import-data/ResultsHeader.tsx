@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, FileSpreadsheet, FileText } from "lucide-react";
+import { CheckCircle, FileSpreadsheet, FileText, Image as ImageIcon } from "lucide-react";
 import { type TotalStats } from "../../services";
 
 interface ResultsHeaderProps {
@@ -29,6 +29,12 @@ export function ResultsHeader({ totalStats }: ResultsHeaderProps) {
             <FileText className="h-3 w-3" />
             {totalStats.successCustomers} customers
           </Badge>
+          {totalStats.totalImages > 0 && (
+            <Badge variant="secondary" className="gap-1">
+              <ImageIcon className="h-3 w-3" />
+              {totalStats.successImages} images
+            </Badge>
+          )}
         </div>
       </div>
     </div>

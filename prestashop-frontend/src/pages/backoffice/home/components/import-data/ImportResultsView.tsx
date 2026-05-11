@@ -11,6 +11,7 @@ interface ImportResultsViewProps {
   productsResults: ImportedRow[];
   variantsResults: ImportedRow[];
   customersResults: ImportedRow[];
+  imagesResults: ImportedRow[];
   totalStats: TotalStats;
   currentPage: number;
   setCurrentPage: (page: number) => void;
@@ -23,6 +24,7 @@ export function ImportResultsView({
   productsResults,
   variantsResults,
   customersResults,
+  imagesResults,
   totalStats,
   currentPage,
   setCurrentPage,
@@ -34,12 +36,14 @@ export function ImportResultsView({
     products: productsResults,
     variants: variantsResults,
     customers: customersResults,
+    images: imagesResults,
   };
 
   const headersMap = {
     products: ["date_produit", "nom", "reference", "prix_ttc", "Taxe", "categorie"],
     variants: ["reference", "specificité", "karazany", "stock_initial", "prix_vente_ttc"],
     customers: ["date", "nom", "email", "pwd", "adresse", "achat", "etat"],
+    images: ["file", "reference", "productId", "imageId"],
   };
 
   const allResults = resultsMap[activeResultTab as keyof typeof resultsMap] || [];
@@ -75,6 +79,7 @@ export function ImportResultsView({
         productsCount={productsResults.length}
         variantsCount={variantsResults.length}
         customersCount={customersResults.length}
+        imagesCount={imagesResults.length}
         headers={headers}
         rows={currentRows}
       />

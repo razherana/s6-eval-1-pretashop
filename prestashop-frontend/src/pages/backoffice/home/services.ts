@@ -59,9 +59,9 @@ export interface TotalStats {
   totalCustomers: number;
   successCustomers: number;
   failedCustomers: number;
-  totalCategories: number;
-  successCategories: number;
-  failedCategories: number;
+  totalImages: number;
+  successImages: number;
+  failedImages: number;
 }
 
 export interface InputRefs {

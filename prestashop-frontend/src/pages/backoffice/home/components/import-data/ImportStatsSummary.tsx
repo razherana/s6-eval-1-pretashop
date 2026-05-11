@@ -23,7 +23,7 @@ export function ImportStatsSummary({
         <Progress value={progress} className="h-2" />
 
         {importComplete && (
-          <div className="grid grid-cols-3 gap-3 mt-4">
+          <div className="grid grid-cols-4 gap-3 mt-4">
             <div className="bg-gray-50 rounded-lg p-3 text-center border">
               <div className="text-xl font-bold text-emerald-600">
                 {totalStats.successProducts}/{totalStats.totalProducts}
@@ -41,6 +41,12 @@ export function ImportStatsSummary({
                 {totalStats.successCustomers}/{totalStats.totalCustomers}
               </div>
               <div className="text-xs text-muted-foreground">Customers</div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-center border">
+              <div className="text-xl font-bold text-amber-600">
+                {totalStats.successImages}/{totalStats.totalImages}
+              </div>
+              <div className="text-xs text-muted-foreground">Images</div>
             </div>
           </div>
         )}

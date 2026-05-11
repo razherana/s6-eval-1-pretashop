@@ -1,6 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Package, FileSpreadsheet, FileText } from "lucide-react";
+import { Package, FileSpreadsheet, FileText, Image } from "lucide-react";
 import { type ImportedRow } from "../../services";
 import { ResultsTable } from "./ResultsTable";
 
@@ -10,6 +10,7 @@ interface ResultsTabsProps {
   productsCount: number;
   variantsCount: number;
   customersCount: number;
+  imagesCount: number;
   headers: string[];
   rows: ImportedRow[];
 }
@@ -20,6 +21,7 @@ export function ResultsTabs({
   productsCount,
   variantsCount,
   customersCount,
+  imagesCount,
   headers,
   rows,
 }: ResultsTabsProps) {
@@ -48,13 +50,25 @@ export function ResultsTabs({
               {customersCount}
             </Badge>
           </TabsTrigger>
+          {imagesCount > 0 && (
+            <TabsTrigger value="images" className="gap-2">
+              <Image className="h-4 w-4" />
+              Images
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                {imagesCount}
+              </Badge>
+            </TabsTrigger>
+          )}
         </TabsList>
       </div>
 
-      {["products", "variants", "customers"].map((tab) => (
+      {["products", "variants", "customers", "images"].map((tab) => (
         <TabsContent key={tab} value={tab} className="flex-1 m-0 overflow-auto">
           <div className="p-6">
-            <ResultsTable headers={headers} rows={rows} />
+            <ResultsTable 
+              headers={tab === activeResultTab ? headers : []} 
+              rows={tab === activeResultTab ? rows : []} 
+            />
           </div>
         </TabsContent>
       ))}
