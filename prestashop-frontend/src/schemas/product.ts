@@ -240,6 +240,17 @@ const dataSchema: DataXmlApiSchema = {
     },
   },
   associations: {
+    categories: {
+      nodeType: "category",
+      api: "categories",
+      fields: {
+        id: { xmlTag: "id", type: "simple" },
+      },
+      csvMapping: {
+        categorie: { transform: "toCategoryById" },
+        id_category_default: { transform: "toCategoryById" },
+      },
+    },
     stock_availables: {
       nodeType: "stock_available",
       api: "stock_availables",
@@ -255,10 +266,6 @@ const dataSchema: DataXmlApiSchema = {
           transform: "toStockAvailable",
           targetField: "quantity",
         },
-        id_product: {
-          transform: "toStockAvailable",
-          targetField: "id_product",
-        },
       },
     },
     images: {
@@ -271,20 +278,20 @@ const dataSchema: DataXmlApiSchema = {
         image_urls: { transform: "toImages" },
       },
     },
-    categories: {
-      nodeType: "category",
-      api: "categories",
-      fields: {
-        id: { xmlTag: "id", type: "simple" },
-      },
-      csvMapping: {
-        id_category_default: { transform: "toCategory" },
-      },
-    },
   },
 };
 
-const transforms: Record<string, AssociationTransformFunction> = {};
+const transforms: Record<string, AssociationTransformFunction> = {
+  toCategoryById: (container, csvValue, _rowData, schema) => {
+    // This will be handled externally since we need category IDs
+    // The categories will be resolved before conversion
+    const categoryIds = csvValue.split(",").filter((id) => id.trim());
+    for (const categoryId of categoryIds) {
+      const categoryElement = container.ele(schema.nodeType);
+      categoryElement.ele("id").dat(categoryId.trim());
+    }
+  },
+};
 
 const productSchema: XmlApiSchema = {
   data: dataSchema,

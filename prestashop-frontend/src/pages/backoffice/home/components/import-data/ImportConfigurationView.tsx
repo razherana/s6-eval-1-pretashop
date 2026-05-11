@@ -13,6 +13,8 @@ interface ImportConfigurationViewProps {
   fileStates: FileStates;
   delimiter: string;
   setDelimiter: (delimiter: string) => void;
+  decimalSeparator: string;
+  setDecimalSeparator: (separator: string) => void;
   currentStep: number;
   isImporting: boolean;
   currentFileProgress: number;
@@ -35,6 +37,8 @@ export function ImportConfigurationView({
   fileStates,
   delimiter,
   setDelimiter,
+  decimalSeparator,
+  setDecimalSeparator,
   currentStep,
   isImporting,
   currentFileProgress,
@@ -81,6 +85,23 @@ export function ImportConfigurationView({
           />
           <p className="text-xs text-muted-foreground">
             Common: comma (,), semicolon (;), tab (\t), pipe (|)
+          </p>
+        </div>
+
+        {/* Decimal Separator Configuration */}
+        <div className="space-y-2">
+          <Label htmlFor="decimalSeparator">Decimal Separator</Label>
+          <Input
+            id="decimalSeparator"
+            value={decimalSeparator}
+            onChange={(e) => setDecimalSeparator(e.target.value)}
+            placeholder="Enter decimal separator (default: ,)"
+            maxLength={1}
+            disabled={isImporting}
+            className="max-w-xs"
+          />
+          <p className="text-xs text-muted-foreground">
+            Common: comma (,) or period (.)
           </p>
         </div>
 

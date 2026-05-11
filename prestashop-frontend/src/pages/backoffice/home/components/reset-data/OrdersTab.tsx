@@ -29,7 +29,7 @@ export function OrdersTab({ onDataLoaded, selectedIds, onSelectionChange }: Orde
       setLoading(true);
       try {
         const data = await fetchOrders(100, 0);
-        setOrders(data);
+        setOrders(data || []);
         onDataLoaded(data);
       } catch (error) {
         console.error("Error loading orders:", error);
@@ -71,7 +71,7 @@ export function OrdersTab({ onDataLoaded, selectedIds, onSelectionChange }: Orde
   }, [expandedOrders, orderDetails]);
 
   const allSelected = useMemo(() =>
-    orders.length > 0 && selectedIds.size === orders.length,
+    orders && orders.length > 0 && selectedIds.size === orders.length,
     [orders, selectedIds]
   );
 
@@ -97,7 +97,7 @@ export function OrdersTab({ onDataLoaded, selectedIds, onSelectionChange }: Orde
     );
   }
 
-  if (orders.length === 0) {
+  if (orders && orders.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-muted-foreground">
         <ShoppingCart className="h-8 w-8 mb-2 opacity-50" />
@@ -121,7 +121,7 @@ export function OrdersTab({ onDataLoaded, selectedIds, onSelectionChange }: Orde
           </TableRow>
         </TableHeader>
         <TableBody>
-          {orders.map((order) => (
+          {orders && orders.map((order) => (
             <>
               <TableRow
                 key={order.id}

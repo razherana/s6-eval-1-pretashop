@@ -72,5 +72,7 @@ export interface CurrencyReadXML {
 export interface CategoryReadXML {
   id: number;
   name: LanguageField;
-  id_parent: number;
+  id_parent: 0 | {
+    "#text": number;
+  };
 }

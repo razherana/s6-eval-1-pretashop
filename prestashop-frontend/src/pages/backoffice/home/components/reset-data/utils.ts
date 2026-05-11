@@ -1,4 +1,4 @@
-import type { ProductReadXML, OrderReadXML, CustomerReadXML } from "../../types";
+import type { ProductReadXML, OrderReadXML, CustomerReadXML, CategoryReadXML } from "../../types";
 import type { DataItem, ResetType } from "../ResetDataModalComponent";
 
 export const getItemName = (item: DataItem, type: ResetType): string => {
@@ -14,6 +14,10 @@ export const getItemName = (item: DataItem, type: ResetType): string => {
     case 'customers': {
       const customer = item as CustomerReadXML;
       return `${customer.firstname} ${customer.lastname}`.trim() || 'Unnamed Customer';
+    }
+    case 'categories': {
+      const category = item as CategoryReadXML;
+      return category.name.language[0]?.['#text'] || 'Unnamed Category';
     }
   }
 };

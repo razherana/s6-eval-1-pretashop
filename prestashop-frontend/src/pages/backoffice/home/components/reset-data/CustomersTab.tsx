@@ -22,7 +22,7 @@ export function CustomersTab({ onDataLoaded, selectedIds, onSelectionChange }: C
       setLoading(true);
       try {
         const data = await fetchCustomers(100, 0);
-        setCustomers(data);
+        setCustomers(data || []);
         onDataLoaded(data);
       } catch (error) {
         console.error("Error loading customers:", error);

@@ -2,15 +2,16 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import React, { useState, useRef } from "react";
 import {
   importCustomersFromFile,
-  importProductsFromFile,
   importVariantsFromFile,
   summarizeZipArchive,
   type ImportSummary,
   type ImportedRow,
 } from "../services";
+import { importProductsFromFile } from "../import-services/product-import";
 import { ImportConfigurationView } from "./import-data/ImportConfigurationView";
 import { ImportResultsView } from "./import-data/ImportResultsView";
 import { type ImportStep, type FileStates, type TotalStats } from "../services";
+import { useLanguage } from "@/utils/lang";
 
 export function ImportProductsModalComponent({ open, setOpen }: { open: boolean, setOpen: React.Dispatch<React.SetStateAction<boolean>> }) {
   // File states
@@ -21,8 +22,13 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
     zip: null,
   });
 
+  const { language } = useLanguage();
+
   // Delimiter
   const [delimiter, setDelimiter] = useState(",");
+
+  // , or . for decimal separator
+  const [decimalSeparator, setDecimalSeparator] = useState(",");
 
   // Import workflow states
   const [currentStep, setCurrentStep] = useState(-1);
@@ -44,6 +50,9 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
     totalCustomers: 0,
     successCustomers: 0,
     failedCustomers: 0,
+    totalCategories: 0,
+    successCategories: 0,
+    failedCategories: 0,
   });
 
   // Results data
@@ -138,18 +147,49 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
 
     const summaries: ImportSummary[] = [];
 
+    // Get language IDs from context
+    const languageIds = language.rawLanguages?.map(l => l.id) || [1, 2, 3];
+
     // Step 1: Products
     setCurrentStep(0);
     setCurrentFileProgress(0);
-    for (let i = 0; i <= 100; i += 10) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      setCurrentFileProgress(i);
-      setProgress(25 * (i / 100));
+
+    // Start the import and update progress simultaneously
+    const productsImportPromise = importProductsFromFile(fileStates.products!, delimiter, decimalSeparator, languageIds);
+
+    // Animate progress while waiting
+    let progressInterval: NodeJS.Timeout | null = null;
+    let productsSummary: ImportSummary;
+
+    try {
+      progressInterval = setInterval(() => {
+        setCurrentFileProgress(prev => {
+          const newProgress = prev + Math.random() * 15;
+          return newProgress >= 90 ? 90 : newProgress; // Cap at 90% until complete
+        });
+        setProgress(prev => {
+          const newProgress = prev + Math.random() * 2;
+          return newProgress >= 22 ? 22 : newProgress; // Cap at 22% for first step
+        });
+      }, 200);
+
+      const productsImport = await productsImportPromise;
+
+      // Clear interval and set to 100%
+      if (progressInterval) clearInterval(progressInterval);
+      setCurrentFileProgress(100);
+      setProgress(25);
+
+      setProductsResults(productsImport.rows);
+      productsSummary = productsImport.summary;
+      summaries.push(productsSummary);
+    } catch (error) {
+      if (progressInterval) clearInterval(progressInterval);
+      console.error(error);
+      throw error;
     }
-    const productsImport = await importProductsFromFile(fileStates.products!, delimiter);
-    setProductsResults(productsImport.rows);
-    const productsSummary = productsImport.summary;
-    summaries.push(productsSummary);
+
+    throw new Error("Simulated error after products import");
 
     // Step 2: Variants
     setCurrentStep(1);
@@ -159,7 +199,7 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
       setCurrentFileProgress(i);
       setProgress(25 + 25 * (i / 100));
     }
-    const variantsImport = await importVariantsFromFile(fileStates.variants!, delimiter);
+    const variantsImport = await importVariantsFromFile(fileStates.variants!, delimiter, decimalSeparator);
     setVariantsResults(variantsImport.rows);
     const variantsSummary = variantsImport.summary;
     summaries.push(variantsSummary);
@@ -172,7 +212,7 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
       setCurrentFileProgress(i);
       setProgress(50 + 25 * (i / 100));
     }
-    const customersImport = await importCustomersFromFile(fileStates.customers!, delimiter);
+    const customersImport = await importCustomersFromFile(fileStates.customers!, delimiter, decimalSeparator);
     setCustomersResults(customersImport.rows);
     const customersSummary = customersImport.summary;
     summaries.push(customersSummary);
@@ -197,6 +237,9 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
       totalCustomers: customersSummary.totalRows,
       successCustomers: customersSummary.successCount,
       failedCustomers: customersSummary.failedCount,
+      totalCategories: 0,
+      successCategories: 0,
+      failedCategories: 0,
     });
 
     setProgress(100);
@@ -244,6 +287,8 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
             fileStates={fileStates}
             delimiter={delimiter}
             setDelimiter={setDelimiter}
+            decimalSeparator={decimalSeparator}
+            setDecimalSeparator={setDecimalSeparator}
             currentStep={currentStep}
             isImporting={isImporting}
             currentFileProgress={currentFileProgress}

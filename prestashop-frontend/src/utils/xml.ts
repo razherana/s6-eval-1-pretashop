@@ -373,13 +373,15 @@ export class PrestaShopXMLConverter {
         );
       }
     }
-
-    // 3. Process associations
-    const associations = product.ele("associations");
-    for (const [assocName, assocSchema] of Object.entries(
-      this.schema.associations,
-    )) {
-      this.handleAssociation(associations, assocName, assocSchema, rowData);
+    
+    if (Object.keys(this.schema.associations).length > 0) {
+      // 3. Process associations
+      const associations = product.ele("associations");
+      for (const [assocName, assocSchema] of Object.entries(
+        this.schema.associations,
+      )) {
+        this.handleAssociation(associations, assocName, assocSchema, rowData);
+      }
     }
 
     return doc.end({ prettyPrint: true });

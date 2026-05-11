@@ -4,10 +4,10 @@ import type {
   ProductReadXML,
   OrderReadXML,
   CustomerReadXML,
+  CategoryReadXML,
   OrderDetailReadXML,
 } from "./types";
 import { PrestaShopXMLConverter } from "@/utils/xml";
-import productSchema from "@/schemas/product";
 
 export interface ImportedRow {
   index: number;
@@ -56,6 +56,9 @@ export interface TotalStats {
   totalCustomers: number;
   successCustomers: number;
   failedCustomers: number;
+  totalCategories: number;
+  successCategories: number;
+  failedCategories: number;
 }
 
 export interface InputRefs {
@@ -65,12 +68,15 @@ export interface InputRefs {
   zip: React.RefObject<HTMLInputElement>;
 }
 
-async function parseCsvFile(file: File, delimiter: string): Promise<Record<string, string>[]> {
+export async function parseCsvFile(
+  file: File,
+  delimiter: string,
+): Promise<Record<string, string>[]> {
   const csv = await file.text();
   return parseCSV(csv, delimiter);
 }
 
-function buildImportSummary(
+export function buildImportSummary(
   step: string,
   fileName: string,
   rows: ImportedRow[],
@@ -81,7 +87,8 @@ function buildImportSummary(
     totalRows: rows.length,
     successCount: rows.filter((row) => row.success).length,
     failedCount: rows.filter((row) => !row.success).length,
-    warnings: rows.filter((row) => row.warnings && row.warnings.length > 0).length,
+    warnings: rows.filter((row) => row.warnings && row.warnings.length > 0)
+      .length,
   };
 }
 
@@ -112,50 +119,11 @@ function validateRequiredFields(
   return true;
 }
 
-export async function importProductsFromFile(file: File, delimiter: string): Promise<ImportResult> {
-  const parsedRows = await parseCsvFile(file, delimiter);
-  const converter = new PrestaShopXMLConverter(productSchema, "");
-
-  const rows: ImportedRow[] = [];
-
-  for (const [index, row] of parsedRows.entries()) {
-    const headers = Object.keys(row);
-    const validation = verifyProductData(row, headers);
-
-    if (validation !== true) {
-      rows.push({
-        index: index + 1,
-        data: row,
-        success: false,
-        error: `Missing required field: ${validation}`,
-      });
-      continue;
-    }
-
-    try {
-      await createProduct(row, converter);
-      rows.push({
-        index: index + 1,
-        data: row,
-        success: true,
-      });
-    } catch (error) {
-      rows.push({
-        index: index + 1,
-        data: row,
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to create product",
-      });
-    }
-  }
-
-  return {
-    summary: buildImportSummary("Products", file.name, rows),
-    rows,
-  };
-}
-
-export async function importVariantsFromFile(file: File, delimiter: string): Promise<ImportResult> {
+export async function importVariantsFromFile(
+  file: File,
+  delimiter: string,
+  _decimalSeparator: string,
+): Promise<ImportResult> {
   const parsedRows = await parseCsvFile(file, delimiter);
   const requiredFields = [
     "reference",
@@ -190,9 +158,21 @@ export async function importVariantsFromFile(file: File, delimiter: string): Pro
   };
 }
 
-export async function importCustomersFromFile(file: File, delimiter: string): Promise<ImportResult> {
+export async function importCustomersFromFile(
+  file: File,
+  delimiter: string,
+  _decimalSeparator: string,
+): Promise<ImportResult> {
   const parsedRows = await parseCsvFile(file, delimiter);
-  const requiredFields = ["date", "nom", "email", "pwd", "adresse", "achat", "etat"];
+  const requiredFields = [
+    "date",
+    "nom",
+    "email",
+    "pwd",
+    "adresse",
+    "achat",
+    "etat",
+  ];
 
   const rows: ImportedRow[] = parsedRows.map((row, index) => {
     const validation = validateRequiredFields(row, requiredFields);
@@ -228,6 +208,30 @@ export async function summarizeZipArchive(file: File): Promise<ImportSummary> {
     failedCount: 0,
     warnings: 0,
   };
+}
+
+export async function fetchCategories(
+  limit: number = 100,
+  offset: number = 0,
+): Promise<CategoryReadXML[]> {
+  const query = new URLSearchParams({
+    display: "full",
+    limit: limit.toString(),
+    offset: offset.toString(),
+  });
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await fetchFromPrestashopApi<any>(
+      `/categories?${query.toString()}`,
+      { method: "GET" },
+    );
+
+    return response.categories.category;
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+    throw error;
+  }
 }
 
 // --- Others
@@ -467,5 +471,26 @@ export async function resetCustomers(customerIds: number[]): Promise<{
   }
 
   return { deletedCustomerIds, failedCustomerIds };
+}
+
+export async function resetCategories(categoryIds: number[]): Promise<{
+  deletedCategoryIds: number[];
+  failedCategoryIds: number[];
+}> {
+  const deletedCategoryIds: number[] = [];
+  const failedCategoryIds: number[] = [];
+
+  for (const id of categoryIds) {
+    try {
+      await fetchFromPrestashopApi(`/categories/${id}`, { method: "DELETE" });
+      console.log(`Deleted category with ID: ${id}`);
+      deletedCategoryIds.push(id);
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      failedCategoryIds.push(id);
+    }
+  }
+
+  return { deletedCategoryIds, failedCategoryIds };
 }
 

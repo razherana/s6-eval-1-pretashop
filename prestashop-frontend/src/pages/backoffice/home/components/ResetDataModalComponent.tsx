@@ -3,13 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, AlertTriangle, Package, ShoppingCart, Users } from "lucide-react";
+import { Loader2, AlertTriangle, Package, ShoppingCart, Users, FolderTree } from "lucide-react";
 import { useState, useCallback } from "react";
-import { type ProductReadXML, type OrderReadXML, type CustomerReadXML } from "../types";
-import { resetProducts, resetOrders, resetCustomers } from "../services";
+import { type ProductReadXML, type OrderReadXML, type CustomerReadXML, type CategoryReadXML } from "../types";
+import { resetProducts, resetOrders, resetCustomers, resetCategories } from "../services";
 import { ProductsTab } from "./reset-data/ProductsTab";
 import { OrdersTab } from "./reset-data/OrdersTab";
 import { CustomersTab } from "./reset-data/CustomersTab";
+import { CategoriesTab } from "./reset-data/CategoriesTab";
 import { DeleteStatusTable } from "./reset-data/DeleteStatusTable";
 import { toast } from "sonner";
 import { getItemName } from "./reset-data/utils";
@@ -20,8 +21,8 @@ interface ResetDataModalProps {
   onResetComplete?: () => void;
 }
 
-export type ResetType = 'products' | 'orders' | 'customers';
-export type DataItem = ProductReadXML | OrderReadXML | CustomerReadXML;
+export type ResetType = 'products' | 'orders' | 'customers' | 'categories';
+export type DataItem = ProductReadXML | OrderReadXML | CustomerReadXML | CategoryReadXML;
 
 export interface DeleteStatus {
   id: number;
@@ -40,7 +41,8 @@ interface ResetOption {
 const RESET_OPTIONS: ResetOption[] = [
   { type: 'products', label: 'Products', icon: <Package className="h-4 w-4" />, description: 'Delete selected products from your catalog' },
   { type: 'orders', label: 'Orders', icon: <ShoppingCart className="h-4 w-4" />, description: 'Delete selected orders from your store' },
-  { type: 'customers', label: 'Customers', icon: <Users className="h-4 w-4" />, description: 'Delete selected customer accounts' }
+  { type: 'customers', label: 'Customers', icon: <Users className="h-4 w-4" />, description: 'Delete selected customer accounts' },
+  { type: 'categories', label: 'Categories', icon: <FolderTree className="h-4 w-4" />, description: 'Delete selected categories from your catalog' }
 ];
 
 export function ResetDataModalComponent({ open, setOpen, onResetComplete }: ResetDataModalProps) {
@@ -71,14 +73,17 @@ export function ResetDataModalComponent({ open, setOpen, onResetComplete }: Rese
     try {
       const result = activeTab === 'products' ? await resetProducts(idsToDelete) :
         activeTab === 'orders' ? await resetOrders(idsToDelete) :
-          await resetCustomers(idsToDelete);
+        activeTab === 'customers' ? await resetCustomers(idsToDelete) :
+          await resetCategories(idsToDelete);
 
       const deletedIds = 'deletedProductIds' in result ? result.deletedProductIds :
         'deletedOrderIds' in result ? result.deletedOrderIds :
-          result.deletedCustomerIds;
+        'deletedCustomerIds' in result ? result.deletedCustomerIds :
+          result.deletedCategoryIds;
       const failedIds = 'failedProductIds' in result ? result.failedProductIds :
         'failedOrderIds' in result ? result.failedOrderIds :
-          result.failedCustomerIds;
+        'failedCustomerIds' in result ? result.failedCustomerIds :
+          result.failedCategoryIds;
 
       setDeleteStatuses(prev => prev.map(status => ({
         ...status,
@@ -146,7 +151,7 @@ export function ResetDataModalComponent({ open, setOpen, onResetComplete }: Rese
             </TabsList>
           </Tabs>
 
-          {!isDeleting && !deleteComplete && data.length > 0 && (
+          {!isDeleting && !deleteComplete && data && data.length > 0 && (
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border mt-4">
               <div className="flex items-center gap-4">
                 <Badge variant="secondary">
@@ -183,6 +188,13 @@ export function ResetDataModalComponent({ open, setOpen, onResetComplete }: Rese
               )}
               {activeTab === 'customers' && (
                 <CustomersTab
+                  onDataLoaded={setData}
+                  selectedIds={selectedIds}
+                  onSelectionChange={setSelectedIds}
+                />
+              )}
+              {activeTab === 'categories' && (
+                <CategoriesTab
                   onDataLoaded={setData}
                   selectedIds={selectedIds}
                   onSelectionChange={setSelectedIds}
