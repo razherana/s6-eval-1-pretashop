@@ -1,4 +1,16 @@
-import type { DataXmlApiSchema, XmlApiSchema } from "@/utils/xml";
+import type { AssociationTransformFunction, DataXmlApiSchema, XmlApiSchema } from "@/utils/xml";
+
+const transforms : Record<string, AssociationTransformFunction> = {
+  toGroupsByIds: (container, groupIds: string, _rowData, _schema) => {
+    const groupElement = container.ele("group");
+    
+    groupIds.split(",").map(id => ({ id: parseInt(id.trim()) })).forEach(group => {
+      groupElement.ele("id").dat(group.id.toString());
+    });
+
+    console.log("Assigned groups with IDs:", groupIds);
+  },
+};
 
 export const customerSchema: XmlApiSchema = {
   data: {
@@ -8,6 +20,11 @@ export const customerSchema: XmlApiSchema = {
         xmlTag: "id",
         type: "simple",
         attributes: {},
+      },
+      id_lang: {
+        xmlTag: "id_lang",
+        type: "simple",
+        attributes: { required: "true" },
       },
       firstname: {
         xmlTag: "firstname",
@@ -39,6 +56,11 @@ export const customerSchema: XmlApiSchema = {
         type: "simple",
         attributes: {},
       },
+      newsletter_date_add: {
+        xmlTag: "newsletter_date_add",
+        type: "simple",
+        attributes: {},
+      },
       optin: {
         xmlTag: "optin",
         type: "simple",
@@ -46,9 +68,29 @@ export const customerSchema: XmlApiSchema = {
       },
     } as DataXmlApiSchema["fields"],
     multiLangFields: {},
-    associations: {},
+    associations: {
+      groups: {
+        nodeType: "groups",
+        api: "groups",
+        fields: {
+          id: {
+            xmlTag: "id",
+            type: "simple",
+            attributes: { required: "true" },
+          },
+        },
+        csvMapping: {
+          groups: {
+            transform: "toGroupsByIds",
+          }
+        }
+      }
+    },
   },
-  transforms: {},
+  transforms: transforms,
 };
+
+
+
 
 export default customerSchema;

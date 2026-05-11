@@ -8,6 +8,8 @@ import {
 } from "../services";
 import { customerSchema } from "@/schemas/customer";
 
+const USER_GROUP_ACCESS = [1, 2, 3];
+
 interface CustomerEmailMap {
   [email: string]: number; // email -> customer ID
 }
@@ -54,9 +56,12 @@ async function createCustomer(
     lastname: lastName,
     email: email,
     passwd: password,
+    id_lang: "1",
     active: "1",
     newsletter: "0",
     optin: "0",
+    newsletter_date_add: "0000-00-00 00:00:00",
+    groups: USER_GROUP_ACCESS.join(","),
   });
 
   try {
@@ -70,36 +75,6 @@ async function createCustomer(
     return parseInt(response.customer.id);
   } catch (error) {
     console.error(`Error creating customer "${email}":`, error);
-    throw error;
-  }
-}
-
-async function updateCustomer(
-  customerId: number,
-  firstName: string,
-  lastName: string,
-  email: string,
-  password: string,
-): Promise<void> {
-  const converter = new PrestaShopXMLConverter(customerSchema, "");
-
-  const xmlData = converter.convertRowToXML({
-    id: customerId.toString(),
-    firstname: firstName,
-    lastname: lastName,
-    email: email,
-    passwd: password,
-    active: "1",
-  });
-
-  try {
-    await fetchFromPrestashopApi("/customers?ps_method=PATCH", {
-      method: "POST",
-      headers: { "Content-Type": "application/xml" },
-      body: xmlData,
-    });
-  } catch (error) {
-    console.error(`Error updating customer "${email}":`, error);
     throw error;
   }
 }
@@ -271,21 +246,7 @@ export async function importCustomersFromFile(
         // Check if customer already exists
         const existingCustomerId = existingCustomers[email];
 
-        if (existingCustomerId) {
-          // Update existing customer
-          console.log(
-            `Updating existing customer "${email}" (ID: ${existingCustomerId})`,
-          );
-          await updateCustomer(
-            existingCustomerId,
-            firstName,
-            lastName,
-            email,
-            password,
-          );
-          customerId = existingCustomerId;
-          warnings.push("Customer already existed, updated information");
-        } else {
+        if (!existingCustomerId) {
           // Create new customer
           console.log(`Creating new customer "${email}"`);
           customerId = await createCustomer(
@@ -296,6 +257,8 @@ export async function importCustomersFromFile(
           );
           // Add to existing customers map to avoid duplicates within the same import
           existingCustomers[email] = customerId;
+        } else {
+          // Do something else
         }
 
         // Store address (if needed, could be added to customer or used for orders)

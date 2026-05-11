@@ -7,8 +7,7 @@ const parser = new XMLParser({
   attributeValueProcessor: (attrName, attrValue, _jPath) => {
     // List the attributes you want to ignore
     const forbidden = ["xlink:href"];
-    if (forbidden.includes(attrName)) 
-      return undefined; // Returning undefined effectively ignores it
+    if (forbidden.includes(attrName)) return undefined; // Returning undefined effectively ignores it
     return attrValue;
   },
 });
@@ -33,7 +32,7 @@ export interface AssociationSchema {
   nodeType: string;
   api: string;
   fields: Record<string, FieldSchema>;
-  csvMapping: Record<string, { transform: string; targetField?: string }>;
+  csvMapping: Record<string, { transform: string }>;
 }
 
 export type AssociationTransformFunction = (
@@ -41,6 +40,7 @@ export type AssociationTransformFunction = (
   csvValue: string,
   rowData: Record<string, string>,
   schema: AssociationSchema,
+  converter: PrestaShopXMLConverter,
 ) => void;
 
 export interface XmlApiSchema {
@@ -147,7 +147,7 @@ export class PrestaShopXMLConverter {
 
       const transformFn = this.transformRegistry[mapping.transform];
       if (transformFn) {
-        transformFn(container, csvValue, rowData, assocSchema);
+        transformFn(container, csvValue, rowData, assocSchema, this);
       } else {
         console.warn(
           `Transform function "${mapping.transform}" not found in registry`,

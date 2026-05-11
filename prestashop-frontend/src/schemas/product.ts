@@ -264,7 +264,6 @@ const dataSchema: DataXmlApiSchema = {
       csvMapping: {
         quantity: {
           transform: "toStockAvailable",
-          targetField: "quantity",
         },
       },
     },
