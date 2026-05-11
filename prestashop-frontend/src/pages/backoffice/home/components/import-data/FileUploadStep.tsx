@@ -78,7 +78,7 @@ export function FileUploadStep({
               {isImporting && isActive && currentFileProgress !== undefined && (
                 <Badge variant="secondary" className="gap-1">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  {currentFileProgress}%
+                  {currentFileProgress.toFixed(0)}%
                 </Badge>
               )}
             </div>
