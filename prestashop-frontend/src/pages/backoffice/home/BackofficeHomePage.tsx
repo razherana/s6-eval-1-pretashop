@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, Package, AlertCircle } from 'lucide-react';
+import { ShoppingCart, Package, AlertCircle, Zap } from 'lucide-react';
 import { ImportProductsModalComponent } from './components/ImportProductsModalComponent';
 import { ResetDataModalComponent } from './components/ResetDataModalComponent';
 import { getFormattedPrice, getWithLanguage, useLanguage } from '@/utils/lang';
@@ -15,6 +15,7 @@ import { SelectLanguageCurrency } from '@/components/ui-manual/select-lang';
 import { Spinner } from '@/components/ui/spinner';
 import { ProductImageCarouselComponent } from './components/ProductImageCarouselComponent';
 import { useBackofficeAuth } from '@/hooks/useBackofficeAuth';
+import { FastResetModalComponent } from './components/FastResetModalComponent';
 
 export function BackofficeHomePage() {
   const { logout } = useBackofficeAuth();
@@ -26,6 +27,7 @@ export function BackofficeHomePage() {
 
   const [isResetOpen, setResetOpen] = useState(false);
   const [importProductsOpen, setImportProductsOpen] = useState(false);
+  const [isFastResetOpen, setFastResetOpen] = useState(false);
 
   useEffect(() => {
     async function loadProducts() {
@@ -101,6 +103,12 @@ export function BackofficeHomePage() {
         onResetComplete={handleResetComplete}
       />
 
+      <FastResetModalComponent
+        open={isFastResetOpen}
+        setOpen={setFastResetOpen}
+        onResetComplete={handleResetComplete}
+      />
+
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8 flex items-center justify-between">
           <div>
@@ -121,6 +129,14 @@ export function BackofficeHomePage() {
             </Button>
             <Button variant="outline" onClick={() => setResetOpen(true)}>
               Reset all data
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setFastResetOpen(true)}
+              className="gap-1.5"
+            >
+              <Zap className="h-4 w-4" />
+              <span className="hidden sm:inline">Fast Reset</span>
             </Button>
             <Button variant="outline" onClick={() => {
               async function loadProducts() {

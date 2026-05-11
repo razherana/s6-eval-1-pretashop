@@ -300,7 +300,12 @@ export async function fetchOrders(
       { method: "GET" },
     );
 
-    return response.orders.order;
+    if(response.orders.order) {
+      return Array.isArray(response.orders.order)
+        ? response.orders.order
+        : [response.orders.order];
+    }
+    return [];
   } catch (error) {
     console.error("Error fetching orders:", error);
     throw error;
