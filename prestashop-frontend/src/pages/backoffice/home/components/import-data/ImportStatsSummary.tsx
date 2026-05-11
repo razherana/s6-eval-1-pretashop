@@ -18,7 +18,7 @@ export function ImportStatsSummary({
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-3">
           <h4 className="font-medium text-sm">Import Progress</h4>
-          <span className="text-sm font-medium">{progress}%</span>
+          <span className="text-sm font-medium">{progress.toFixed(0)}%</span>
         </div>
         <Progress value={progress} className="h-2" />
 

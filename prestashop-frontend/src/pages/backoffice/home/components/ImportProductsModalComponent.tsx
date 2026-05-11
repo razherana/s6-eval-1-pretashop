@@ -2,12 +2,14 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import React, { useState, useRef } from "react";
 import {
   importCustomersFromFile,
-  importVariantsFromFile,
   summarizeZipArchive,
   type ImportSummary,
   type ImportedRow,
 } from "../services";
+
 import { importProductsFromFile } from "../import-services/product-import";
+import { importVariantsFromFile } from "../import-services/variant-import";
+
 import { ImportConfigurationView } from "./import-data/ImportConfigurationView";
 import { ImportResultsView } from "./import-data/ImportResultsView";
 import { type ImportStep, type FileStates, type TotalStats } from "../services";
@@ -189,20 +191,48 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
       throw error;
     }
 
-    throw new Error("Simulated error after products import");
-
     // Step 2: Variants
     setCurrentStep(1);
     setCurrentFileProgress(0);
-    for (let i = 0; i <= 100; i += 10) {
-      await new Promise(resolve => setTimeout(resolve, 80));
-      setCurrentFileProgress(i);
-      setProgress(25 + 25 * (i / 100));
+
+    const variantsImportPromise = importVariantsFromFile(
+      fileStates.variants!,
+      delimiter,
+      decimalSeparator,
+      languageIds
+    );
+
+    let variantsProgressInterval: NodeJS.Timeout | null = null;
+    let variantsSummary: ImportSummary;
+
+    try {
+      variantsProgressInterval = setInterval(() => {
+        setCurrentFileProgress(prev => {
+          const newProgress = prev + Math.random() * 15;
+          return newProgress >= 90 ? 90 : newProgress;
+        });
+        setProgress(prev => {
+          const newProgress = prev + Math.random() * 2;
+          return newProgress >= 48 ? 48 : newProgress;
+        });
+      }, 200);
+
+      const variantsImport = await variantsImportPromise;
+
+      if (variantsProgressInterval) clearInterval(variantsProgressInterval);
+      setCurrentFileProgress(100);
+      setProgress(50);
+
+      setVariantsResults(variantsImport.rows);
+      variantsSummary = variantsImport.summary;
+      summaries.push(variantsSummary);
+    } catch (error) {
+      if (variantsProgressInterval) clearInterval(variantsProgressInterval);
+      console.error(error);
+      throw error;
     }
-    const variantsImport = await importVariantsFromFile(fileStates.variants!, delimiter, decimalSeparator);
-    setVariantsResults(variantsImport.rows);
-    const variantsSummary = variantsImport.summary;
-    summaries.push(variantsSummary);
+
+    throw new Error("Simulated error after products import");
 
     // Step 3: Customers
     setCurrentStep(2);
