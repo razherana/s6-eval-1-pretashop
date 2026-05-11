@@ -257,16 +257,6 @@ async function ensureTaxesExist(
   return taxMap;
 }
 
-function isLocaleRegistered(localeKey: string): boolean {
-  try {
-    numeral.localeData(localeKey);
-    return true;
-  } catch (error) {
-    // Error message format: 'Unknown locale : {key}'
-    return false;
-  }
-}
-
 export async function importProductsFromFile(
   file: File,
   delimiter: string,
@@ -296,8 +286,7 @@ export async function importProductsFromFile(
     },
   };
 
-  if (!isLocaleRegistered("product-import-locale"))
-    numeral.register("locale", "product-import-locale", customLocale);
+  numeral.locales["product-import-locale"] = customLocale;
 
   numeral.locale("product-import-locale");
 
@@ -350,14 +339,19 @@ export async function importProductsFromFile(
   }
 
   numeral.locale("product-import-locale");
-  
+
   // Step 4: Process each product
   for (const [index, row] of parsedRows.entries()) {
     try {
       // Map CSV fields to schema fields
       const productData: Record<string, string> = {
         ...row,
-        price: numeral(row.prix_ttc || "0").value().toString(),
+        wholesale_price: numeral(row.prix_achat || "0")
+          .value()
+          .toString(),
+        price: numeral(row.prix_ttc || "0")
+          .value()
+          .toString(),
         reference: row.reference || "",
         state: "1",
         active: "1",
