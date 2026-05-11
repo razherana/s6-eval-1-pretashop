@@ -1,7 +1,8 @@
 import { createElement } from "react";
 import type { RouteObject } from "react-router-dom";
 import { backofficeRoutes } from "./backofficeRoutes";
-import { BackofficeLayout } from "@/components/layout/BackofficeLayout";
+import { BackofficeProtectedLayout } from "@/components/layout/BackofficeProtectedLayout";
+import { frontofficeRoutes } from "./frontofficeRoutes";
 
 export const mainRoutes : RouteObject[] = [
   {
@@ -14,7 +15,8 @@ export const mainRoutes : RouteObject[] = [
   },
   {
     path: "/backoffice",
-    element: createElement(BackofficeLayout),
+    element: createElement(BackofficeProtectedLayout),
     children: backofficeRoutes,
   },
+  ...frontofficeRoutes
 ];

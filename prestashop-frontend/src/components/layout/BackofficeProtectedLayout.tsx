@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useBackofficeAuth } from "@/hooks/useBackofficeAuth";
 
-export function BackofficeLayout() {
+export function BackofficeProtectedLayout() {
   const { authData } = useBackofficeAuth();
   const location = useLocation();
 

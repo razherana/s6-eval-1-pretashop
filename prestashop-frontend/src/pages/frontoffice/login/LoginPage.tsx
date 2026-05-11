@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import { useBackofficeAuth } from "@/hooks/useBackofficeAuth";
+import { useFrontofficeAuth } from "@/hooks/useFrontofficeAuth";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,14 +17,14 @@ import { Label } from "@/components/ui/label";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { authData, login } = useBackofficeAuth();
+  const { authData, login } = useFrontofficeAuth();
   const [username, setUsername] = useState("johndoe");
   const [password, setPassword] = useState("password123");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (authData.isAuthenticated) {
-      navigate("/backoffice/home", { replace: true });
+      navigate("/frontoffice/home", { replace: true });
     }
   }, [authData.isAuthenticated, navigate]);
 
@@ -35,7 +35,7 @@ export function LoginPage() {
       setLoading(true);
       await login(username, password);
       toast.success("Successfully logged in.");
-      navigate("/backoffice/home", { replace: true });
+      navigate("/frontoffice/home", { replace: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to log in.";
       toast.error(message);
@@ -48,9 +48,9 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-linear-to-b from-slate-50 to-slate-100 px-4 py-12 dark:from-slate-950 dark:to-slate-900">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl">Backoffice login</CardTitle>
+          <CardTitle className="text-2xl">Login to your Account</CardTitle>
           <CardDescription>
-            Sign in to access the backoffice dashboard.
+            Sign in to access your account.
           </CardDescription>
         </CardHeader>
 
