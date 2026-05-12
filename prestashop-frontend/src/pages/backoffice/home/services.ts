@@ -247,11 +247,13 @@ export async function fetchCategories(
 export async function fetchProducts(
   limit: number,
   offset: number,
+  extraParams: Record<string, string> = {},
 ): Promise<ProductReadXML[]> {
   const query = new URLSearchParams({
     display: "full",
     limit: limit.toString(),
     offset: offset.toString(),
+    ...extraParams,
   });
 
   try {

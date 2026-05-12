@@ -7,6 +7,8 @@ import { LanguageProvider } from './providers/LanguageProvider.tsx';
 import { DATABASE_LANGUAGE_ID, DATABASE_CURRENCY_ID } from './utils/lang.ts';
 import { BackofficeAuthProvider } from './providers/BackofficeAuthProvider.tsx';
 import { FrontofficeAuthProvider } from './providers/FrontofficeAuthProvider.tsx';
+import { CartProvider } from './providers/CartProvider.tsx';
+import { FrontofficeDataProvider } from './providers/FrontofficeDataProvider.tsx';
 
 const router = createBrowserRouter(mainRoutes);
 
@@ -16,7 +18,11 @@ createRoot(document.getElementById('root')!).render(
     <LanguageProvider initialLanguageId={DATABASE_LANGUAGE_ID} initialCurrencyId={DATABASE_CURRENCY_ID}>
       <BackofficeAuthProvider>
         <FrontofficeAuthProvider>
-          <RouterProvider router={router} />
+          <FrontofficeDataProvider>
+            <CartProvider>
+              <RouterProvider router={router} />
+            </CartProvider>
+          </FrontofficeDataProvider>
         </FrontofficeAuthProvider>
       </BackofficeAuthProvider>
     </LanguageProvider>

@@ -12,10 +12,10 @@ import { ImportProductsModalComponent } from './components/ImportProductsModalCo
 import { ResetDataModalComponent } from './components/ResetDataModalComponent';
 import { getFormattedPrice, getWithLanguage, useLanguage } from '@/utils/lang';
 import { SelectLanguageCurrency } from '@/components/ui-manual/select-lang';
-import { Spinner } from '@/components/ui/spinner';
 import { ProductImageCarouselComponent } from './components/ProductImageCarouselComponent';
 import { useBackofficeAuth } from '@/hooks/useBackofficeAuth';
 import { FastResetModalComponent } from './components/FastResetModalComponent';
+import { LanguageLoadingComponent } from '@/components/ui-manual/language-loading-state';
 
 export function BackofficeHomePage() {
   const { logout } = useBackofficeAuth();
@@ -62,15 +62,7 @@ export function BackofficeHomePage() {
 
   if (!language) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Alert variant="default">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle> Loading...</AlertTitle>
-          <AlertDescription className='flex gap-3 items-center'>
-            <Spinner />
-            Loading language settings. Please wait.</AlertDescription>
-        </Alert>
-      </div>
+      <LanguageLoadingComponent />
     )
   }
 

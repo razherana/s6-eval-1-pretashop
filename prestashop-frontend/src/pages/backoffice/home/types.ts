@@ -17,7 +17,14 @@ export interface ProductReadXML {
           id: number;
           "@_xlink:href": string;
         },
-      ];
+      ] | [];
+    };
+    combinations: {
+      combination?: [
+        {
+          id: number;
+        },
+      ] | [];
     };
   };
   price: number;
@@ -27,6 +34,44 @@ export interface ProductReadXML {
         "#text": number;
       }
     | "";
+  price_ttc?: number;
+}
+
+export interface CombinationDetailXML {
+  id: number;
+  id_product: {
+    "#text": number;
+  };
+  reference: string;
+  price: number;
+  ean13?: string;
+  upc?: string;
+  wholesale_price?: number;
+  weight?: number;
+  minimal_quantity?: number;
+  default_on?: string;
+  associations?: {
+    product_option_values?: {
+      product_option_value?: Array<{
+        id: number;
+      }> | {
+        id: number;
+      };
+    };
+  };
+}
+
+export interface ProductOptionValueXML {
+  id: number;
+  name: LanguageField;
+  id_attribute_group: string;
+}
+
+export interface ProductOptionXML {
+  id: number;
+  name: LanguageField;
+  public_name: LanguageField;
+  position: number;
 }
 
 export interface OrderReadXML {
@@ -106,4 +151,12 @@ export interface TaxRuleReadXML {
   id_country: string;
   id_tax: number;
   behavior: string;
+}
+
+export interface ProductOptionValueDetail {
+  id: number;
+  id_attribute_group: number;
+  name: LanguageField;
+  color?: string;
+  position?: number;
 }
