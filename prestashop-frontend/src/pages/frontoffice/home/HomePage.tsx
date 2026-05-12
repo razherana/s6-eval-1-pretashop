@@ -1,20 +1,20 @@
 // src/pages/frontoffice/home/HomePage.tsx - Updated header section
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { CartDrawerComponent } from './components/CartDrawerComponent';
 import { ProductGridComponent } from './components/ProductGridComponent';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useFrontofficeAuth } from '@/hooks/useFrontofficeAuth';
 import { Button } from '@/components/ui/button';
-import { 
-  Search, 
-  Filter, 
-  Grid3X3, 
-  List, 
-  User, 
-  LogOut, 
+import {
+  Search,
+  Filter,
+  Grid3X3,
+  List,
+  User,
+  LogOut,
   LogIn,
-  ShoppingBag 
+  ShoppingBag
 } from 'lucide-react';
 import { LanguageLoadingComponent } from '@/components/ui-manual/language-loading-state';
 import { SelectLanguageCurrency } from '@/components/ui-manual/select-lang';
@@ -64,7 +64,11 @@ export function HomePage() {
         <div className="container mx-auto px-4">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-primary">PrestaShop</h1>
+              <Link to="/">
+                <h1 className="text-2xl font-bold text-primary">
+                  PrestaShop
+                </h1>
+              </Link>
             </div>
 
             <div className="hidden md:flex flex-1 mx-8">
@@ -81,7 +85,7 @@ export function HomePage() {
             <div className="flex items-center space-x-4">
               <SelectLanguageCurrency />
               <CartDrawerComponent />
-              
+
               {/* User Menu */}
               {authData.isAuthenticated && authData.user ? (
                 <DropdownMenu>
@@ -113,8 +117,8 @@ export function HomePage() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => navigate('/frontoffice/login')}
                 >

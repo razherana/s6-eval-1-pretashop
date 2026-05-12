@@ -16,6 +16,7 @@ import { ProductImageCarouselComponent } from './components/ProductImageCarousel
 import { useBackofficeAuth } from '@/hooks/useBackofficeAuth';
 import { FastResetModalComponent } from './components/FastResetModalComponent';
 import { LanguageLoadingComponent } from '@/components/ui-manual/language-loading-state';
+import { Link } from 'react-router-dom';
 
 export function BackofficeHomePage() {
   const { logout } = useBackofficeAuth();
@@ -104,9 +105,11 @@ export function BackofficeHomePage() {
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
-              Prestashop
-            </h1>
+            <Link to="/">
+              <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
+                Prestashop
+              </h1>
+            </Link>
             <p className="mt-2 text-lg text-muted-foreground">
               Discover our latest products
             </p>
