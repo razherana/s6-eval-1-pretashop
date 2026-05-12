@@ -216,6 +216,8 @@ async function createTaxRule(
   }
 }
 
+const TAX_PRECISION = 6;
+
 async function ensureTaxesExist(
   taxPercentages: string[],
   languageIds: number[],
@@ -230,7 +232,7 @@ async function ensureTaxesExist(
   for (const percentage of taxPercentages) {
     const cleanPercentage = numeral(percentage.replace("%", "").trim())
       .value()
-      .toString();
+      .toFixed(TAX_PRECISION);
 
     if (!taxMap[cleanPercentage]) {
       // Create tax
@@ -342,9 +344,10 @@ export async function importProductsFromFile(
 
   // Step 4: Process each product
   for (const [index, row] of parsedRows.entries()) {
+    console.log(`Processing row ${index + 1}:`, row);
     try {
       const cleanTax = row.Taxe
-        ? numeral(row.Taxe.replace("%", "").trim()).value().toFixed(2)
+        ? numeral(row.Taxe.replace("%", "").trim()).value().toFixed(TAX_PRECISION)
         : "0";
 
       // Map CSV fields to schema fields
@@ -352,11 +355,11 @@ export async function importProductsFromFile(
         ...row,
         wholesale_price: numeral(row.prix_achat || "0")
           .value()
-          .toFixed(2),
+          .toFixed(6),
         price: (
           numeral(row.prix_ttc || "0").value() /
           (1 + (taxMap[cleanTax]?.taxId ? parseFloat(cleanTax) / 100 : 0))
-        ).toFixed(2),
+        ).toFixed(6),
         reference: row.reference || "",
         state: "1",
         active: "1",
@@ -382,6 +385,7 @@ export async function importProductsFromFile(
 
       // Set tax
       if (row.Taxe) {
+        console.log(`Row ${index + 1} tax percentage: ${cleanTax}. Tax map entry:`, taxMap[cleanTax]);
         if (taxMap[cleanTax]) {
           productData.id_tax_rules_group =
             taxMap[cleanTax].taxRuleGroupId.toString();
