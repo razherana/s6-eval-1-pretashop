@@ -361,8 +361,8 @@ export async function createOrder(
     total_paid_tax_incl: "0",
     total_paid_tax_excl: "0",
     total_paid_real: "0", // Not paid yet
-    total_products: totalAmount.toFixed(2),
-    total_products_wt: totalAmountWt.toFixed(2),
+    total_products: totalAmount.toFixed(6),
+    total_products_wt: totalAmountWt.toFixed(6),
     total_shipping: "0",
     total_shipping_tax_incl: "0",
     total_shipping_tax_excl: "0",
@@ -488,16 +488,30 @@ export async function processFullOrderFlow(
   },
   languageId: number = 1,
   currencyId: number = 1,
+  existingCustomerId?: number,
 ): Promise<OrderResult> {
   try {
-    // Step 1: Create guest customer
-    toast.info("Creating your account...");
-    const customer = await createGuestCustomer(
-      customerInfo.firstname,
-      customerInfo.lastname,
-      customerInfo.email,
-      languageId,
-    );
+    let customer: GuestCustomer;
+
+    if (existingCustomerId) {
+      // Use existing customer
+      toast.info("Using your account...");
+      customer = {
+        id: existingCustomerId,
+        firstname: customerInfo.firstname,
+        lastname: customerInfo.lastname,
+        email: customerInfo.email,
+      };
+    } else {
+      // Step 1: Create guest customer
+      toast.info("Creating your account...");
+      customer = await createGuestCustomer(
+        customerInfo.firstname,
+        customerInfo.lastname,
+        customerInfo.email,
+        languageId,
+      );
+    }
 
     // Step 2: Create address
     toast.info("Saving your address...");
@@ -542,22 +556,20 @@ export async function processFullOrderFlow(
     toast.info("Processing shipment...");
     await updateOrderState(order.id, ORDER_STATES.SHIPPED);
 
-    // Small delay to simulate processing
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     // Step 7: Update order to "Delivered"
     toast.info("Order delivered...");
     await updateOrderState(order.id, ORDER_STATES.DELIVERED);
 
-    // Small delay to simulate delivery
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     // Step 8: Record payment and update to "Payment Accepted"
     toast.info("Processing payment...");
     await addOrderPayment(
       order.reference,
       currencyId,
-      cartTotal.total,
+      cartTotal.total_wt,
       "Cash On Delivery",
     );
     await updateOrderState(order.id, ORDER_STATES.PAYMENT_ACCEPTED);
@@ -565,7 +577,7 @@ export async function processFullOrderFlow(
     return {
       orderId: order.id,
       orderReference: order.reference,
-      totalAmount: cartTotal.total,
+      totalAmount: cartTotal.total_wt,
     };
   } catch (error) {
     console.error("Order flow failed:", error);

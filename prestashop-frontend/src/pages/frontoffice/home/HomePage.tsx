@@ -1,18 +1,40 @@
+// src/pages/frontoffice/home/HomePage.tsx - Updated header section
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CartDrawerComponent } from './components/CartDrawerComponent';
 import { ProductGridComponent } from './components/ProductGridComponent';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useFrontofficeAuth } from '@/hooks/useFrontofficeAuth';
 import { Button } from '@/components/ui/button';
-import { Search, Filter, Grid3X3, List } from 'lucide-react';
+import { 
+  Search, 
+  Filter, 
+  Grid3X3, 
+  List, 
+  User, 
+  LogOut, 
+  LogIn,
+  ShoppingBag 
+} from 'lucide-react';
 import { LanguageLoadingComponent } from '@/components/ui-manual/language-loading-state';
 import { SelectLanguageCurrency } from '@/components/ui-manual/select-lang';
 import { FrontofficeDataLoadingComponent } from '@/components/ui-manual/frontofficedata-loading-state';
 import { useFrontofficeData } from '@/hooks/useFrontofficeData';
 import { CheckoutDialogComponent } from './components/CheckoutDialogComponent';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export function HomePage() {
   const { language } = useLanguage();
   const { data } = useFrontofficeData();
+  const { authData, logout } = useFrontofficeAuth();
+  const navigate = useNavigate();
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
@@ -21,12 +43,17 @@ export function HomePage() {
   }
 
   if (!data) {
-    return <FrontofficeDataLoadingComponent />
+    return <FrontofficeDataLoadingComponent />;
   }
 
   const currency = language.currency;
   const locale = language.locale;
   const conversionRate = language.conversion_change;
+
+  const handleLogout = () => {
+    logout();
+    navigate('/frontoffice/home');
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -54,6 +81,47 @@ export function HomePage() {
             <div className="flex items-center space-x-4">
               <SelectLanguageCurrency />
               <CartDrawerComponent />
+              
+              {/* User Menu */}
+              {authData.isAuthenticated && authData.user ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" className="relative">
+                      <User className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          {authData.user.firstname} {authData.user.lastname}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {authData.user.email}
+                        </span>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => navigate('/frontoffice/orders')}>
+                      <ShoppingBag className="mr-2 h-4 w-4" />
+                      My Orders
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => navigate('/frontoffice/login')}
+                >
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Login
+                </Button>
+              )}
             </div>
           </div>
         </div>

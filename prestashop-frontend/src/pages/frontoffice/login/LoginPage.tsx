@@ -18,8 +18,8 @@ import { Label } from "@/components/ui/label";
 export function LoginPage() {
   const navigate = useNavigate();
   const { authData, login } = useFrontofficeAuth();
-  const [username, setUsername] = useState("johndoe");
-  const [password, setPassword] = useState("password123");
+  const [username, setUsername] = useState("rakoto@yopmail.com");
+  const [password, setPassword] = useState("XvzsX5O0!GBD0uXQ");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export function LoginPage() {
     }
   }, [authData.isAuthenticated, navigate]);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     try {
