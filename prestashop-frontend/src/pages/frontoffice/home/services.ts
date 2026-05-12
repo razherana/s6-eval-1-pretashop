@@ -7,6 +7,7 @@ import type {
   ProductOptionXML,
   ProductOptionValueDetail,
 } from "@/pages/backoffice/home/types";
+import { toast } from "sonner";
 
 export interface FrontofficeData {
   products: ProductReadXML[];
@@ -30,27 +31,30 @@ export async function fetchProducts(
     display: "full",
     limit: limit.toString(),
     offset: offset.toString(),
-    "price[product][use_tax]": "1",
+    "price[price_ttc][use_tax]": "1",
   });
 
   try {
     const response = await fetchFromPrestashopApi<{
-      products: { 
+      products: {
         product?: ProductReadXML | ProductReadXML[];
       };
     }>(`/products?${query.toString()}`, { method: "GET" });
 
     const products = response.products?.product || [];
-    const productArray : ProductReadXML[] = (Array.isArray(products) ? products : [products]).map((product) => ({
+    const productArray: ProductReadXML[] = (
+      Array.isArray(products) ? products : [products]
+    ).map((product) => ({
       ...product,
       associations: {
         ...product.associations,
         images: {
           ...product.associations.images,
-          image: !Array.isArray(product.associations.images.image) &&
+          image:
+            !Array.isArray(product.associations.images.image) &&
             product.associations.images.image
-            ? [product.associations.images.image]
-            : product.associations.images.image || [],
+              ? [product.associations.images.image]
+              : product.associations.images.image || [],
         },
         combinations: {
           ...product.associations.combinations,
@@ -95,13 +99,17 @@ async function fetchAllProductOptions(): Promise<ProductOptionXML[]> {
 }
 
 // Fetch all product option values (like Blue, Large, Cotton) - rarely changes
-async function fetchAllProductOptionValues(): Promise<ProductOptionValueDetail[]> {
+async function fetchAllProductOptionValues(): Promise<
+  ProductOptionValueDetail[]
+> {
   const query = new URLSearchParams({ display: "full" });
 
   try {
     const response = await fetchFromPrestashopApi<{
       product_option_values: {
-        product_option_value?: ProductOptionValueDetail | ProductOptionValueDetail[];
+        product_option_value?:
+          | ProductOptionValueDetail
+          | ProductOptionValueDetail[];
       };
     }>(`/product_option_values?${query.toString()}`, { method: "GET" });
 
@@ -154,7 +162,9 @@ export async function fetchProductCombinations(
     }>(`/combinations?${query.toString()}`, { method: "GET" });
 
     const combinations = response.combinations?.combination || [];
-    const combinationsArray = Array.isArray(combinations) ? combinations : [combinations];
+    const combinationsArray = Array.isArray(combinations)
+      ? combinations
+      : [combinations];
 
     // Cache the result
     if (cache) {
@@ -163,7 +173,10 @@ export async function fetchProductCombinations(
 
     return combinationsArray;
   } catch (error) {
-    console.error(`Error fetching combinations for product ${productId}:`, error);
+    console.error(
+      `Error fetching combinations for product ${productId}:`,
+      error,
+    );
     return [];
   }
 }
@@ -203,4 +216,34 @@ export async function fetchInitialProducts(
 ): Promise<void> {
   const { products } = await fetchProducts(1, limit);
   data.products = products;
+}
+
+export async function fetchProductCombinationPrice(
+  combinationId: number,
+  productId: number,
+): Promise<number> {
+  const query = new URLSearchParams({
+    display: `[price_ttc]`,
+    [`price[price_ttc][product_attribute]`]: combinationId.toString(),
+  });
+
+  try {
+    const response = await fetchFromPrestashopApi<{
+      product?: {
+        price_ttc: number;
+      };
+    }>(`/products/${productId}?${query.toString()}`, { method: "GET" });
+
+    const product = response.product;
+    return product?.price_ttc || 0;
+  } catch (error) {
+    console.error(
+      `Error fetching price for combination ${combinationId}:`,
+      error,
+    );
+    toast.error(
+      "Failed to fetch price for selected combination. Please try again.",
+    );
+    return 0;
+  }
 }

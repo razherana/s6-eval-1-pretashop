@@ -8,7 +8,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useFrontofficeData } from '@/hooks/useFrontofficeData';
-import { fetchProductCombinations } from '../services';
+import { fetchProductCombinationPrice, fetchProductCombinations } from '../services';
 import { getWithLanguage } from '@/utils/lang';
 import { useLanguage } from '@/hooks/useLanguage';
 
@@ -146,7 +146,9 @@ export function ProductCombinationSelectComponent({
     const combination = combinations.find((c) => c.id === combinationId);
 
     if (combination) {
-      onSelect(combination, combination.price);
+      // Fetch the product with the price with tax calculation for this combination
+      const price : number = await fetchProductCombinationPrice(combination.id, productId);
+      onSelect(combination, price);
     }
   };
 
