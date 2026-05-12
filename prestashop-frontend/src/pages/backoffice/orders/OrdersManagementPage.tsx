@@ -6,7 +6,8 @@ import {
   fetchAllOrders,
   fetchAllOrderStates,
   updateOrderState,
-  fetchOrderDetailsById
+  fetchOrderDetailsById,
+  processDeliveryAndPayment
 } from "./services/orderServices";
 import { LanguageLoadingComponent } from "@/components/ui-manual/language-loading-state";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ import {
   Loader2,
   RefreshCw,
   type LucideProps,
+  CheckCheck,
 } from "lucide-react";
 import { getFormattedPrice, getWithLanguage } from "@/utils/lang";
 import { toast } from "sonner";
@@ -78,6 +80,25 @@ export function OrdersManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // State for processing
+  const [_, setProcessingOrder] = useState(false);
+
+  // Add handler function
+  const handleDeliverAndPay = async (order: OrderReadXML) => {
+    setProcessingOrder(true);
+    try {
+      await processDeliveryAndPayment(order);
+
+      // Reload orders
+      const ordersData = await fetchAllOrders(100);
+      setOrders(ordersData);
+    } catch (error) {
+      console.error("Error processing delivery:", error);
+    } finally {
+      setProcessingOrder(false);
+    }
+  };
 
   // Selected order for modal
   const [selectedOrder, setSelectedOrder] = useState<OrderReadXML | null>(null);
@@ -381,6 +402,25 @@ export function OrdersManagementPage() {
                                   <History className="mr-2 h-4 w-4" />
                                   Change State
                                 </DropdownMenuItem>
+
+                                {/* Show Deliver & Pay only for awaiting orders */}
+                                {(() => {
+                                  const stateId = order.current_state["#text"];
+
+                                  // Show for awaiting payment states (1, 10, 13, 14)
+                                  if ([1, 10, 13, 14].includes(stateId)) {
+                                    return (
+                                      <DropdownMenuItem
+                                        onClick={() => handleDeliverAndPay(order)}
+                                        className="text-green-600 focus:text-green-600"
+                                      >
+                                        <CheckCheck className="mr-2 h-4 w-4" />
+                                        Deliver & Pay
+                                      </DropdownMenuItem>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>

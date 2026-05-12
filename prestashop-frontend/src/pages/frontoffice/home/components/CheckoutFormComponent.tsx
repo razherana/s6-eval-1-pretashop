@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCart } from '@/hooks/useCart';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useFrontofficeAuth } from '@/hooks/useFrontofficeAuth';
-import { processFullOrderFlow } from '../services/orderService';
+import { processCheckout } from '../services/orderService';
 import { Loader2, CheckCircle, Package, User, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -81,7 +81,7 @@ export function CheckoutFormComponent() {
         phone: formDataToSubmit.phone,
       };
 
-      const result = await processFullOrderFlow(
+      const result = await processCheckout(
         items,
         customerInfo,
         language?.language_id || 1,

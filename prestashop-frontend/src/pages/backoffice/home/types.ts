@@ -88,6 +88,12 @@ export interface OrderReadXML {
   current_state: {
     "#text": number;
   };
+  id_currency: {
+    "#text": number;
+  };
+  id_customer: {
+    "#text": number;
+  };
 
   // Not an association but manually added in the code after fetching order details
   order_details?: OrderDetailReadXML[];

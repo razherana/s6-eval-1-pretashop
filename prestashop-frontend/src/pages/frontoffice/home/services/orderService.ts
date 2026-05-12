@@ -475,8 +475,10 @@ export async function addOrderPayment(
   }
 }
 
-// Complete order flow: Create -> Ship -> Deliver -> Pay
-export async function processFullOrderFlow(
+// src/pages/frontoffice/home/services/orderService.ts
+// Keep only processCheckout that creates order without auto-completing
+
+export async function processCheckout(
   cartItems: CartItem[],
   customerInfo: {
     firstname: string;
@@ -494,7 +496,6 @@ export async function processFullOrderFlow(
     let customer: GuestCustomer;
 
     if (existingCustomerId) {
-      // Use existing customer
       toast.info("Using your account...");
       customer = {
         id: existingCustomerId,
@@ -503,7 +504,6 @@ export async function processFullOrderFlow(
         email: customerInfo.email,
       };
     } else {
-      // Step 1: Create guest customer
       toast.info("Creating your account...");
       customer = await createGuestCustomer(
         customerInfo.firstname,
@@ -513,7 +513,6 @@ export async function processFullOrderFlow(
       );
     }
 
-    // Step 2: Create address
     toast.info("Saving your address...");
     const addressId = await createAddress(
       customer.id,
@@ -525,7 +524,6 @@ export async function processFullOrderFlow(
       COUNTRY_ID,
     );
 
-    // Step 3: Create cart with products
     toast.info("Creating your cart...");
     const cartId = await createCart(
       cartItems,
@@ -535,11 +533,9 @@ export async function processFullOrderFlow(
       addressId,
     );
 
-    // Step 4: Calculate total from cart
     const cartTotal = await getCartTotal(cartId);
     console.log("Cart Total:", cartTotal);
 
-    // Step 5: Create order with "Awaiting Cash On Delivery" state
     toast.info("Placing your order...");
     const order = await createOrder(
       cartId,
@@ -552,27 +548,8 @@ export async function processFullOrderFlow(
       "Paiement à la livraison",
     );
 
-    // Step 6: Update order to "Shipped"
-    toast.info("Processing shipment...");
-    await updateOrderState(order.id, ORDER_STATES.SHIPPED);
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Step 7: Update order to "Delivered"
-    toast.info("Order delivered...");
-    await updateOrderState(order.id, ORDER_STATES.DELIVERED);
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Step 8: Record payment and update to "Payment Accepted"
-    toast.info("Processing payment...");
-    await addOrderPayment(
-      order.reference,
-      currencyId,
-      cartTotal.total_wt,
-      "Cash On Delivery",
-    );
-    await updateOrderState(order.id, ORDER_STATES.PAYMENT_ACCEPTED);
+    // Update the state to "Awaiting Cash On Delivery" (state ID 13)
+    await updateOrderState(order.id, ORDER_STATES.AWAITING_CASH_ON_DELIVERY);
 
     return {
       orderId: order.id,
@@ -580,7 +557,7 @@ export async function processFullOrderFlow(
       totalAmount: cartTotal.total_wt,
     };
   } catch (error) {
-    console.error("Order flow failed:", error);
+    console.error("Checkout failed:", error);
     toast.error("Order process failed. Please try again.");
     throw error;
   }
