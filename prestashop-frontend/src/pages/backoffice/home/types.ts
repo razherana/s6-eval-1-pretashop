@@ -12,19 +12,23 @@ export interface ProductReadXML {
   name: LanguageField;
   associations: {
     images: {
-      image?: [
-        {
-          id: number;
-          "@_xlink:href": string;
-        },
-      ] | [];
+      image?:
+        | [
+            {
+              id: number;
+              "@_xlink:href": string;
+            },
+          ]
+        | [];
     };
     combinations: {
-      combination?: [
-        {
-          id: number;
-        },
-      ] | [];
+      combination?:
+        | [
+            {
+              id: number;
+            },
+          ]
+        | [];
     };
   };
   price: number;
@@ -52,11 +56,13 @@ export interface CombinationDetailXML {
   default_on?: string;
   associations?: {
     product_option_values?: {
-      product_option_value?: Array<{
-        id: number;
-      }> | {
-        id: number;
-      };
+      product_option_value?:
+        | Array<{
+            id: number;
+          }>
+        | {
+            id: number;
+          };
     };
   };
 }
@@ -79,7 +85,11 @@ export interface OrderReadXML {
   reference: string;
   total_paid: number;
   payment: string;
-  current_state: string;
+  current_state: {
+    "#text": number;
+  };
+
+  // Not an association but manually added in the code after fetching order details
   order_details?: OrderDetailReadXML[];
 }
 
@@ -89,11 +99,58 @@ export interface OrderDetailReadXML {
   product_id: {
     "#text": number;
   };
+  product_attribute_id: {
+    "#text": number;
+  };
   product_name: string;
   product_quantity: number;
   product_price: number;
   total_price_tax_incl: number;
   product_reference: string;
+}
+
+export interface OrderStateXML {
+  id: number;
+  name: LanguageField;
+  template: LanguageField;
+  unremovable?: string;
+  delivery?: string;
+  hidden?: string;
+  send_email?: string;
+  module_name?: string;
+  invoice?: string;
+  color?: string;
+  logable?: string;
+  shipped?: string;
+  paid?: string;
+  pdf_delivery?: string;
+  pdf_invoice?: string;
+  deleted?: string;
+}
+
+export interface OrderHistoryXML {
+  id: number;
+  id_order: {
+    "#text": number;
+  };
+  id_order_state: {
+    "#text": number;
+  };
+  id_employee?: {
+    "#text": number;
+  };
+  date_add: string;
+}
+
+export interface OrderPaymentXML {
+  id: number;
+  order_reference: string;
+  id_currency: string;
+  amount: number;
+  payment_method: string;
+  conversion_rate: number;
+  transaction_id?: string;
+  date_add: string;
 }
 
 export interface CustomerReadXML {

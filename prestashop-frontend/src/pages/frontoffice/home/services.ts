@@ -6,6 +6,7 @@ import type {
   CombinationDetailXML,
   ProductOptionXML,
   ProductOptionValueDetail,
+  OrderStateXML,
 } from "@/pages/backoffice/home/types";
 import { toast } from "sonner";
 
@@ -14,7 +15,7 @@ export interface FrontofficeData {
   categories: CategoryReadXML[];
   productOptions: Map<number, ProductOptionXML>;
   productOptionValues: Map<number, ProductOptionValueDetail>;
-  // Cache for combinations - loaded on demand per product
+  orderStates: Map<number, OrderStateXML>;
   combinationsCache: Map<number, CombinationDetailXML[]>;
 }
 
@@ -181,15 +182,34 @@ export async function fetchProductCombinations(
   }
 }
 
-// Initialize the frontoffice data store
+// Add to the static data fetching
+async function fetchAllOrderStates(): Promise<OrderStateXML[]> {
+  const query = new URLSearchParams({ display: "full" });
+
+  try {
+    const response = await fetchFromPrestashopApi<{
+      order_states: {
+        order_state?: OrderStateXML | OrderStateXML[];
+      };
+    }>(`/order_states?${query.toString()}`, { method: "GET" });
+
+    const states = response.order_states?.order_state || [];
+    return Array.isArray(states) ? states : [states];
+  } catch (error) {
+    console.error("Error fetching order states:", error);
+    return [];
+  }
+}
+
+// Update initializeFrontofficeData
 export async function initializeFrontofficeData(): Promise<FrontofficeData> {
-  const [categories, productOptions, optionValues] = await Promise.all([
+  const [categories, productOptions, optionValues, orderStates] = await Promise.all([
     fetchAllCategories(),
     fetchAllProductOptions(),
     fetchAllProductOptionValues(),
+    fetchAllOrderStates(),
   ]);
 
-  // Build Maps for O(1) lookups
   const productOptionsMap = new Map<number, ProductOptionXML>();
   productOptions.forEach((option) => {
     productOptionsMap.set(option.id, option);
@@ -200,11 +220,17 @@ export async function initializeFrontofficeData(): Promise<FrontofficeData> {
     productOptionValuesMap.set(value.id, value);
   });
 
+  const orderStatesMap = new Map<number, OrderStateXML>();
+  orderStates.forEach((state) => {
+    orderStatesMap.set(state.id, state);
+  });
+
   return {
     products: [],
     categories,
     productOptions: productOptionsMap,
     productOptionValues: productOptionValuesMap,
+    orderStates: orderStatesMap,
     combinationsCache: new Map(),
   };
 }
@@ -247,3 +273,4 @@ export async function fetchProductCombinationPrice(
     return 0;
   }
 }
+

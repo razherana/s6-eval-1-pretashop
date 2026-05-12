@@ -8,5 +8,9 @@ export const frontofficeRoutes : RouteObject[] = [
   {
     path: "/frontoffice/home",
     lazy: () => import("@/pages/frontoffice/home/HomePage").then(module => ({ Component: module.HomePage }))
+  },
+  {
+    path: "/frontoffice/orders",
+    lazy: () => import("@/pages/frontoffice/orders/OrdersPage").then(module => ({ Component: module.OrdersPage }))
   }
 ];
