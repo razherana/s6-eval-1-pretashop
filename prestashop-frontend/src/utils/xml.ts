@@ -140,6 +140,17 @@ export class PrestaShopXMLConverter {
       api: assocSchema.api,
     });
 
+    // First, add any simple fields defined in the association schema
+    for (const [fieldName, fieldSchema] of Object.entries(assocSchema.fields)) {
+      const csvField = Object.keys(rowData).find(
+        (key) => key.toLowerCase() === fieldName.toLowerCase(),
+      );
+      if (csvField) {
+        const value = rowData[csvField];
+        this.addSimpleField(container, fieldSchema.xmlTag, value, fieldSchema);
+      }
+    }
+
     // Process each CSV mapping using the registry
     for (const [csvField, mapping] of Object.entries(assocSchema.csvMapping)) {
       const csvValue = rowData[csvField];

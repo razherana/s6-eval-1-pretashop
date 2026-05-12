@@ -8,6 +8,7 @@ import { LanguageLoadingComponent } from '@/components/ui-manual/language-loadin
 import { SelectLanguageCurrency } from '@/components/ui-manual/select-lang';
 import { FrontofficeDataLoadingComponent } from '@/components/ui-manual/frontofficedata-loading-state';
 import { useFrontofficeData } from '@/hooks/useFrontofficeData';
+import { CheckoutDialogComponent } from './components/CheckoutDialogComponent';
 
 export function HomePage() {
   const { language } = useLanguage();
@@ -29,6 +30,8 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <CheckoutDialogComponent />
+
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
         <div className="container mx-auto px-4">

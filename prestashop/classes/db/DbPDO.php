@@ -148,6 +148,7 @@ class DbPDOCore extends Db
     protected function _query($sql)
     {
         try {
+            file_put_contents(_PS_ROOT_DIR_.'/log/sql_debug.log', $sql . PHP_EOL, FILE_APPEND);
             return $this->link->query($sql);
         } catch (PDOException $exception) {
             throw new PrestaShopException($exception->getMessage(), (int) $exception->getCode(), $exception);

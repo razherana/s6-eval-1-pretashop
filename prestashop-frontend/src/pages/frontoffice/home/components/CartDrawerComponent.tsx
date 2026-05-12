@@ -157,7 +157,19 @@ export function CartDrawerComponent() {
                 <span>Total</span>
                 <span>${totalPrice.toFixed(2)}</span>
               </div>
-              <Button className="w-full" size="lg">
+              <div className="text-xs text-muted-foreground text-center">
+                <p>Free shipping • Payment on delivery</p>
+              </div>
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={() => {
+                  // Navigate to checkout or open checkout modal
+                  setIsOpen(false);
+                  // You can emit an event or use router here
+                  window.dispatchEvent(new CustomEvent('openCheckout'));
+                }}
+              >
                 Proceed to Checkout
               </Button>
             </div>

@@ -19,6 +19,9 @@ export async function fetchFromPrestashopApi<T = unknown>(
   if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
   const data = await response.text();
+
+  console.log("Fetched XML data from PrestaShop API:", data);
+
   return readXml<T>(data);
 }
 
