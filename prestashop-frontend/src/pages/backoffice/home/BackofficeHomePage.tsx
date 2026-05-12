@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, Package, AlertCircle, Zap } from 'lucide-react';
+import { ShoppingCart, Package, AlertCircle, Zap, ClipboardList } from 'lucide-react';
 import { ImportProductsModalComponent } from './components/ImportProductsModalComponent';
 import { ResetDataModalComponent } from './components/ResetDataModalComponent';
 import { getFormattedPrice, getWithLanguage, useLanguage } from '@/utils/lang';
@@ -151,6 +151,12 @@ export function BackofficeHomePage() {
               loadProducts();
             }}>
               Refresh
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/backoffice/orders">
+                <ClipboardList className="mr-2 h-4 w-4" />
+                Orders
+              </Link>
             </Button>
             <Button onClick={logout}>Log out</Button>
             <SelectLanguageCurrency />

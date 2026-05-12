@@ -142,6 +142,18 @@ export interface OrderHistoryXML {
   date_add: string;
 }
 
+export interface OrderCarrierXML {
+  id: number;
+  id_order: string;
+  id_carrier: string;
+  id_order_invoice?: string;
+  weight?: number;
+  shipping_cost_tax_excl?: number;
+  shipping_cost_tax_incl?: number;
+  tracking_number?: string;
+  date_add: string;
+}
+
 export interface OrderPaymentXML {
   id: number;
   order_reference: string;

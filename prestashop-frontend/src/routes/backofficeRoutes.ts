@@ -8,4 +8,11 @@ export const backofficeRoutes: RouteObject[] = [
         (module) => ({ Component: module.BackofficeHomePage }),
       ),
   },
+  {
+    path: "orders",
+    lazy: () =>
+      import("@/pages/backoffice/orders/OrdersManagementPage").then(
+        (module) => ({ Component: module.OrdersManagementPage }),
+      ),
+  },
 ];

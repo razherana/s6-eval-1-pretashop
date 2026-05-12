@@ -66,7 +66,6 @@ export async function fetchOrderHistory(
   const query = new URLSearchParams({
     display: "full",
     "filter[id_order]": orderId.toString(),
-    // sort: "date_add_ASC",
   });
 
   try {
@@ -77,7 +76,7 @@ export async function fetchOrderHistory(
     }>(`/order_histories?${query.toString()}`, { method: "GET" });
 
     const history = response.order_histories?.order_history || [];
-    return Array.isArray(history) ? history : [history];
+    return (Array.isArray(history) ? history : [history]).sort((a, b) => new Date(a.date_add).getTime() - new Date(b.date_add).getTime());
   } catch (error) {
     console.error(`Error fetching order history for order ${orderId}:`, error);
     throw error;
