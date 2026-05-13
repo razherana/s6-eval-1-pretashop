@@ -21,7 +21,7 @@ export interface ProductReadXML {
   name: LanguageField;
   associations: {
     images: {
-      image?:
+      image:
         | [
             {
               id: number;
@@ -34,7 +34,7 @@ export interface ProductReadXML {
           };
     };
     combinations: {
-      combination?:
+      combination:
         | [
             {
               id: number;

@@ -46,10 +46,16 @@ export function ProductCardComponent({
   );
   const { addToCart } = useCart();
 
-  const images = product.associations?.images?.image || [];
+  const imagesData = product.associations?.images?.image;
+  const images = Array.isArray(imagesData)
+    ? imagesData
+    : imagesData
+      ? [imagesData]
+      : [];
   const productName = getWithLanguage(product.name, languageId);
-  const hasCombinations =
-    product.associations?.combinations?.combination?.length > 0;
+  const combinationData = product.associations?.combinations?.combination;
+  const combinationArray = Array.isArray(combinationData) ? combinationData : combinationData ? [combinationData] : [];
+  const hasCombinations = combinationArray.length > 0;
 
   const formattedPrice = getFormattedPrice(
     currentPrice,

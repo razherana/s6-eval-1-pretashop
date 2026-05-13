@@ -139,7 +139,7 @@ async function createTax(
         return acc;
       },
       {
-        rate: numeral(percentage.replace("%", "")).value().toString(),
+        rate: String(numeral(percentage.replace("%", "")).value()),
         active: "1",
         deleted: "0",
       },
@@ -230,11 +230,10 @@ async function ensureTaxesExist(
   numeral.locale("product-import-locale");
 
   for (const percentage of taxPercentages) {
-    const cleanPercentage = numeral(percentage.replace("%", "").trim())
-      .value()
-      .toFixed(TAX_PRECISION);
+    const cleanPercentage = numeral(percentage.replace("%", "").trim()).value();
+    const cleanPercentageStr = cleanPercentage?.toFixed(TAX_PRECISION) || "0";
 
-    if (!taxMap[cleanPercentage]) {
+    if (!taxMap[cleanPercentageStr]) {
       // Create tax
       const { taxId } = await createTax(percentage, languageIds);
 
@@ -347,17 +346,19 @@ export async function importProductsFromFile(
     console.log(`Processing row ${index + 1}:`, row);
     try {
       const cleanTax = row.Taxe
-        ? numeral(row.Taxe.replace("%", "").trim()).value().toFixed(TAX_PRECISION)
+        ? (numeral(row.Taxe.replace("%", "").trim()).value() ?? 0).toFixed(
+            TAX_PRECISION,
+          )
         : "0";
 
       // Map CSV fields to schema fields
       const productData: Record<string, string> = {
         ...row,
-        wholesale_price: numeral(row.prix_achat || "0")
-          .value()
-          .toFixed(6),
+        wholesale_price: (numeral(row.prix_achat || "0").value() || 0).toFixed(
+          6,
+        ),
         price: (
-          numeral(row.prix_ttc || "0").value() /
+          (numeral(row.prix_ttc || "0").value() || 0) /
           (1 + (taxMap[cleanTax]?.taxId ? parseFloat(cleanTax) / 100 : 0))
         ).toFixed(6),
         reference: row.reference || "",
@@ -385,7 +386,10 @@ export async function importProductsFromFile(
 
       // Set tax
       if (row.Taxe) {
-        console.log(`Row ${index + 1} tax percentage: ${cleanTax}. Tax map entry:`, taxMap[cleanTax]);
+        console.log(
+          `Row ${index + 1} tax percentage: ${cleanTax}. Tax map entry:`,
+          taxMap[cleanTax],
+        );
         if (taxMap[cleanTax]) {
           productData.id_tax_rules_group =
             taxMap[cleanTax].taxRuleGroupId.toString();

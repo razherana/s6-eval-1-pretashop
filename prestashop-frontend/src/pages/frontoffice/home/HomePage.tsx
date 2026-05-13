@@ -8,7 +8,6 @@ import { useFrontofficeAuth } from '@/hooks/useFrontofficeAuth';
 import { Button } from '@/components/ui/button';
 import {
   Search,
-  Filter,
   Grid3X3,
   List,
   User,
@@ -29,6 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { SearchFilterComponent } from './components/SearchFilterComponent';
 
 export function HomePage() {
   const { language } = useLanguage();
@@ -162,10 +162,7 @@ export function HomePage() {
           </div>
 
           <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm">
-              <Filter className="h-4 w-4 mr-2" />
-              Filters
-            </Button>
+            <SearchFilterComponent />
             <div className="flex border rounded-lg">
               <Button
                 variant={viewMode === 'grid' ? 'secondary' : 'ghost'}

@@ -1,5 +1,7 @@
+// src/contexts/FrontofficeDataProvider.tsx
 import { FrontofficeDataContext } from "@/contexts/FrontofficeDataContext";
 import { type FrontofficeData, fetchInitialProducts, fetchProducts, initializeFrontofficeData } from "@/pages/frontoffice/home/services";
+import type { SearchFilters } from "@/pages/frontoffice/home/types/search";
 import { useState, useCallback, useEffect } from "react";
 
 const PRODUCTS_PER_PAGE = 50;
@@ -14,13 +16,14 @@ export function FrontofficeDataProvider({
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [filters, setFilters] = useState<SearchFilters>({});
 
-  const initialize = useCallback(async () => {
+  const initialize = useCallback(async (searchFilters?: SearchFilters) => {
     try {
       setLoading(true);
       setError(null);
       const store = await initializeFrontofficeData();
-      await fetchInitialProducts(store, PRODUCTS_PER_PAGE);
+      await fetchInitialProducts(store, PRODUCTS_PER_PAGE, searchFilters);
       setData(store);
       setCurrentPage(1);
       setHasMore(store.products.length >= PRODUCTS_PER_PAGE);
@@ -41,6 +44,7 @@ export function FrontofficeDataProvider({
       const { products: newProducts } = await fetchProducts(
         nextPage,
         PRODUCTS_PER_PAGE,
+        filters,
       );
 
       if (newProducts.length === 0) {
@@ -48,9 +52,7 @@ export function FrontofficeDataProvider({
       } else {
         setData({
           ...data,
-          products: [
-            ...data.products, ...newProducts
-          ]
+          products: [...data.products, ...newProducts],
         });
         setCurrentPage(nextPage);
         setHasMore(newProducts.length >= PRODUCTS_PER_PAGE);
@@ -60,7 +62,25 @@ export function FrontofficeDataProvider({
     } finally {
       setLoading(false);
     }
-  }, [data, currentPage, loading]);
+  }, [data, currentPage, loading, filters]);
+
+  const applyFilters = useCallback(async (newFilters: SearchFilters) => {
+    setFilters(newFilters);
+    try {
+      setLoading(true);
+      setError(null);
+      const store = await initializeFrontofficeData();
+      await fetchInitialProducts(store, PRODUCTS_PER_PAGE, newFilters);
+      setData(store);
+      setCurrentPage(1);
+      setHasMore(store.products.length >= PRODUCTS_PER_PAGE);
+    } catch (err) {
+      setError('Failed to apply filters');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -70,7 +90,17 @@ export function FrontofficeDataProvider({
 
   return (
     <FrontofficeDataContext.Provider
-      value={{ data, loading, error, hasMore, loadMore, refresh: initialize }}
+      value={{ 
+        data, 
+        loading, 
+        error, 
+        hasMore, 
+        loadMore, 
+        refresh: initialize,
+        filters,
+        setFilters,
+        applyFilters,
+      }}
     >
       {children}
     </FrontofficeDataContext.Provider>

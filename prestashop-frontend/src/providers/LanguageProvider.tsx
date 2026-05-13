@@ -41,7 +41,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({
         );
 
         rawLanguages = (await fetchFromPrestashopApi<{
-          languages:{
+          languages: {
             language: LanguageReadXML[];
           }
         }>(
@@ -96,8 +96,8 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({
           rawCurrencies = [rawCurrencies];
       }
 
-      if (languageData && languageData.language && currencyData && currencyData.currencies && currencyData.currencies.currency) {
-        const newData : LanguageData = {
+      if (languageData && languageData.language && currencyData && currencyData.currencies && rawCurrencies) {
+        const newData: LanguageData = {
           locale: languageData.language.locale,
           language_name: languageData.language.name,
           language_code: languageData.language.language_code,
@@ -121,7 +121,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({
   }, [initialCurrencyId, initialLanguageId]);
 
   const value: LanguageContextType = {
-    language,
+    language: language as LanguageData,
     setLanguage: (rawLanguage: LanguageReadXML) => {
       localStorage.setItem("languageId", rawLanguage.id.toString());
 

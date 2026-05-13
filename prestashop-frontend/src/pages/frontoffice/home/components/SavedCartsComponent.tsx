@@ -267,9 +267,12 @@ export function SavedCartsComponent({
                           <div key={index}>
                             <div className="flex items-start gap-3">
                               <div className="h-12 w-12 shrink-0 rounded overflow-hidden bg-gray-100">
-                                {product.product?.associations?.images?.image?.[0] ? (
+                                {(() => {
+                                  const images = product.product?.associations?.images?.image;
+                                  const normalizedImages = Array.isArray(images) ? images : images ? [images] : [];
+                                  return normalizedImages?.[0] ? (
                                   <img
-                                    src={`${product.product.associations.images.image[0]['@_xlink:href']}?${API_QUERY}`}
+                                    src={`${normalizedImages[0]['@_xlink:href']}?${API_QUERY}`}
                                     alt=""
                                     className="h-full w-full object-cover"
                                   />
@@ -277,7 +280,8 @@ export function SavedCartsComponent({
                                   <div className="flex h-full items-center justify-center">
                                     <Package className="h-6 w-6 text-gray-400" />
                                   </div>
-                                )}
+                                );
+                                })()}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <h5 className="text-sm font-medium truncate">

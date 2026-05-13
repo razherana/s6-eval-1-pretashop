@@ -100,7 +100,7 @@ export function TaxRulesTab({ onDataLoaded, selectedIds, onSelectionChange }: Ta
                 />
               </TableCell>
               <TableCell className="font-mono text-muted-foreground">#{rule.id}</TableCell>
-              <TableCell className="font-medium">Group #{rule.id_tax_rules_group}</TableCell>
+              <TableCell className="font-medium">Group #{typeof rule.id_tax_rules_group === 'object' ? rule.id_tax_rules_group['#text'] : rule.id_tax_rules_group}</TableCell>
               <TableCell>#{rule.id_country}</TableCell>
               <TableCell>#{rule.id_tax}</TableCell>
               <TableCell>

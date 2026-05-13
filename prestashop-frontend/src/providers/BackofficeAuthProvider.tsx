@@ -15,7 +15,7 @@ export function BackofficeAuthProvider({
       setIsAuthenticated(true);
       return JSON.parse(localStorage.getItem("user")!);
     }
-    return null;
+    return undefined;
   });
 
   const data: BackofficeAuthData = {

@@ -9,6 +9,7 @@ import type {
   OrderStateXML,
 } from "@/pages/backoffice/home/types";
 import { toast } from "sonner";
+import type { SearchFilters } from "./types/search";
 
 export interface FrontofficeData {
   products: ProductReadXML[];
@@ -19,10 +20,13 @@ export interface FrontofficeData {
   combinationsCache: Map<number, CombinationDetailXML[]>;
 }
 
-// Fetch products with pagination support
+// src/pages/frontoffice/home/services.ts - Add/update these functions
+
+// Update fetchProducts to support filters
 export async function fetchProducts(
   page: number = 1,
   limit: number = 50,
+  filters?: SearchFilters,
 ): Promise<{
   products: ProductReadXML[];
   totalCount: number;
@@ -34,6 +38,31 @@ export async function fetchProducts(
     offset: offset.toString(),
     "price[price_ttc][use_tax]": "1",
   });
+
+  // Apply filters using PrestaShop API syntax
+  if (filters?.name) {
+    // Contains operator: %[search]%
+    query.append("filter[name]", `%[${filters.name}]%`);
+  }
+
+  if (filters?.categoryId) {
+    // Filter by category association
+    query.append("filter[id_category_default]", `[${filters.categoryId}]`);
+  }
+
+  if (filters?.priceMin !== undefined && filters?.priceMax !== undefined) {
+    // Interval operator: [min,max]
+    query.append("filter[price]", `[${filters.priceMin},${filters.priceMax}]`);
+  } else if (filters?.priceMin !== undefined) {
+    // Greater than or equal
+    query.append("filter[price]", `[${filters.priceMin},1000000]`);
+  } else if (filters?.priceMax !== undefined) {
+    // Less than or equal
+    query.append("filter[price]", `[0,${filters.priceMax}]`);
+  }
+
+  // Only show active products
+  query.append("filter[active]", "[1]");
 
   try {
     const response = await fetchFromPrestashopApi<{
@@ -49,14 +78,6 @@ export async function fetchProducts(
       ...product,
       associations: {
         ...product.associations,
-        images: {
-          ...product.associations.images,
-          image:
-            !Array.isArray(product.associations.images.image) &&
-            product.associations.images.image
-              ? [product.associations.images.image]
-              : product.associations.images.image || [],
-        },
         combinations: {
           ...product.associations.combinations,
           combination: Array.isArray(
@@ -78,6 +99,16 @@ export async function fetchProducts(
     console.error("Error fetching products:", error);
     throw error;
   }
+}
+
+// Fetch initial products with optional filters
+export async function fetchInitialProducts(
+  data: FrontofficeData,
+  limit: number = 50,
+  filters?: SearchFilters,
+): Promise<void> {
+  const { products } = await fetchProducts(1, limit, filters);
+  data.products = products;
 }
 
 // Fetch all product options (like Size, Color) - rarely changes
@@ -233,15 +264,6 @@ export async function initializeFrontofficeData(): Promise<FrontofficeData> {
     orderStates: orderStatesMap,
     combinationsCache: new Map(),
   };
-}
-
-// Fetch initial products
-export async function fetchInitialProducts(
-  data: FrontofficeData,
-  limit: number = 50,
-): Promise<void> {
-  const { products } = await fetchProducts(1, limit);
-  data.products = products;
 }
 
 export async function fetchProductCombinationPrice(

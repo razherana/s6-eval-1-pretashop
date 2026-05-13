@@ -63,7 +63,7 @@ export function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [authData.user.id]);
+  }, [authData.user?.id]);
 
   useEffect(() => {
     if (!authData.isAuthenticated) {

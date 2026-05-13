@@ -13,10 +13,10 @@ export async function parseCSV(
         skip_empty_lines: true,
         trim: true,
       },
-      (err: Error | null, records: Record<string, string>[]) => {
+      (err: Error | null | undefined, records?: Record<string, string>[]) => {
         if (err) {
           reject(err);
-        } else {
+        } else if (records) {
           resolve(records);
         }
       },

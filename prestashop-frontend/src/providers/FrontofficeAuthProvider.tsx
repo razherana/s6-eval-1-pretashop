@@ -39,7 +39,7 @@ export function FrontofficeAuthProvider({
       console.error("Error reading stored user:", error);
       localStorage.removeItem("frontoffice_user");
     }
-    return null;
+    return undefined;
   });
 
   const data: FrontofficeAuthData = {

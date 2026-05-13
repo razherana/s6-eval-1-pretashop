@@ -91,6 +91,9 @@ export function OrderDetailsComponent({ orderId, language }: OrderDetailsProps) 
                 if (combinationData) {
                   const name = buildCombinationName(combinationData, data, language.language_id);
                   setCombinationNames(prev => ({ ...prev, [combId]: name }));
+                  setCombinationsCache(prev => ({ ...prev, [combId]: combinationData }));
+                } else {
+                  setCombinationsCache(prev => ({ ...prev, [combId]: null }));
                 }
               } catch (error) {
                 console.error(`Error fetching combination ${combId}:`, error);

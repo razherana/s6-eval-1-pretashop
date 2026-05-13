@@ -550,7 +550,8 @@ export async function importVariantsFromFile(
     > = new Map();
 
     for (const taxRule of allTaxRules) {
-      const taxRate = taxRule.id_tax ? allTaxes.get(taxRule.id_tax).rate : 0;
+      const taxData = taxRule.id_tax ? allTaxes.get(taxRule.id_tax) : null;
+      const taxRate = taxData ? taxData.rate : 0;
       
       taxRuleGroupMap.set(taxRule.id_tax_rules_group["#text"], {
         taxRate,

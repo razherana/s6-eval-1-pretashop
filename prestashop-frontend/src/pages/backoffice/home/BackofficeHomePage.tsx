@@ -30,6 +30,12 @@ export function BackofficeHomePage() {
   const [importProductsOpen, setImportProductsOpen] = useState(false);
   const [isFastResetOpen, setFastResetOpen] = useState(false);
 
+  const normalizeImages = (images: {
+    id: number;
+  } | [{id:number;}]) => {
+    return Array.isArray(images) ? images : images ? [images] : [];
+  };
+
   useEffect(() => {
     async function loadProducts() {
       try {
@@ -185,17 +191,21 @@ export function BackofficeHomePage() {
                 className="group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
               >
                 <div className="relative overflow-hidden bg-gray-100 dark:bg-gray-800">
-                  {product.associations.images.image && product.associations.images.image.length > 0 ? (
-                    <ProductImageCarouselComponent
-                      images={product.associations.images.image}
-                      productName={product.name}
-                      languageId={language.language_id}
-                    />
-                  ) : (
-                    <div className="flex h-48 items-center justify-center bg-gray-200 dark:bg-gray-700">
-                      <Package className="h-12 w-12 text-gray-400" />
-                    </div>
-                  )}
+                  {(() => {
+                    const images = product.associations.images.image;
+                    const normalizedImages = Array.isArray(images) ? images : images ? [images] : [];
+                    return normalizedImages.length > 0 ? (
+                      <ProductImageCarouselComponent
+                        images={normalizedImages}
+                        productName={product.name}
+                        languageId={language.language_id}
+                      />
+                    ) : (
+                      <div className="flex h-48 items-center justify-center bg-gray-200 dark:bg-gray-700">
+                        <Package className="h-12 w-12 text-gray-400" />
+                      </div>
+                    );
+                  })()}
                   <Badge
                     className="absolute top-2 right-2 z-10 bg-white/90 text-gray-900 hover:bg-white dark:bg-gray-900/90 dark:text-white"
                     variant="secondary"
@@ -223,11 +233,14 @@ export function BackofficeHomePage() {
                       <Package className="h-4 w-4" />
                       In Stock
                     </span>
-                    {product.associations.images.image && product.associations.images.image.length > 1 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{product.associations.images.image.length - 1} images
-                      </Badge>
-                    )}
+                    {(() => {
+                      const normalizedImages = normalizeImages(product.associations.images.image);
+                      return normalizedImages.length > 1 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{normalizedImages.length - 1} images
+                        </Badge>
+                      );
+                    })()}
                   </div>
                 </CardFooter>
               </Card>

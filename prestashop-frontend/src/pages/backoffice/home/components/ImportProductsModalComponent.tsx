@@ -334,10 +334,10 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
             onCancel={() => setOpen(false)}
             onViewDetails={() => setShowResultsTable(true)}
             inputRefs={{
-              products: productsInputRef,
-              variants: variantsInputRef,
-              customers: customersInputRef,
-              zip: zipInputRef,
+              products: productsInputRef as React.RefObject<HTMLInputElement>,
+              variants: variantsInputRef as React.RefObject<HTMLInputElement>,
+              customers: customersInputRef as React.RefObject<HTMLInputElement>,
+              zip: zipInputRef as React.RefObject<HTMLInputElement>,
             }}
           />
         )}
