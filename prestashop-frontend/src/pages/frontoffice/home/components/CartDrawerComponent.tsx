@@ -10,10 +10,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { ShoppingCart, Minus, Plus, Trash2 } from 'lucide-react';
+import { ShoppingCart, Minus, Plus, Trash2, Save } from 'lucide-react';
 import { API_QUERY } from '@/utils/url';
+import { useFrontofficeAuth } from '@/hooks/useFrontofficeAuth';
+import { useLanguage } from '@/utils/lang';
+import { toast } from 'sonner';
+import { saveCart } from '../services/cartService';
 
-export function CartDrawerComponent() {
+export function CartDrawerComponent({
+  setIsCheckoutOpen
+}: {
+  setIsCheckoutOpen: (open: boolean) => void;
+}) {
   const {
     items,
     removeFromCart,
@@ -24,6 +32,9 @@ export function CartDrawerComponent() {
     isOpen,
     setIsOpen,
   } = useCart();
+
+  const { authData } = useFrontofficeAuth();
+  const { language } = useLanguage();
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -61,6 +72,22 @@ export function CartDrawerComponent() {
             <ShoppingCart className="h-16 w-16" />
             <p className="text-lg font-medium">Your cart is empty</p>
             <p className="text-sm">Add some products to get started!</p>
+
+            <div>
+              <Button onClick={() => setIsOpen(false)} className="mt-2">
+                Continue Shopping
+              </Button>{' '}or{' '}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsOpen(false);
+                  setIsCheckoutOpen(true);
+                }}
+                className="mt-2"
+              >
+                Check Saved Carts
+              </Button>
+            </div>
           </div>
         ) : (
           <>
@@ -160,14 +187,40 @@ export function CartDrawerComponent() {
               <div className="text-xs text-muted-foreground text-center">
                 <p>Free shipping • Payment on delivery</p>
               </div>
+
+              {/* Save Cart Button - only show for authenticated users */}
+              {authData.isAuthenticated && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  size="sm"
+                  onClick={async () => {
+                    setIsOpen(false);
+                    try {
+                      await saveCart(
+                        items,
+                        authData.user!.id,
+                        language?.currency_id || 1,
+                        language?.language_id || 1,
+                      );
+                      clearCart();
+                    } catch (error) {
+                      toast.error("Failed to save cart");
+                    }
+                  }}
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Cart for Later
+                </Button>
+              )}
+
               <Button
                 className="w-full"
                 size="lg"
                 onClick={() => {
                   // Navigate to checkout or open checkout modal
                   setIsOpen(false);
-                  // You can emit an event or use router here
-                  window.dispatchEvent(new CustomEvent('openCheckout'));
+                  setIsCheckoutOpen(true);
                 }}
               >
                 Proceed to Checkout

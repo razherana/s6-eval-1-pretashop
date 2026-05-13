@@ -542,7 +542,7 @@ function getOrderFlow(status: string): {
 } {
   const statusLower = status.toLowerCase().trim();
 
-  if (statusLower === "paiement accepté") {
+  if (statusLower === "paiement accepté" || statusLower === "paiement effectué") {
     return {
       stateId: ORDER_STATES.PAYMENT_ACCEPTED,
     };
@@ -801,6 +801,18 @@ export async function importCustomersFromFile(
                 addressId,
                 parse(date, "dd/MM/yyyy", new Date()),
               );
+
+              if(etat === '') {
+                // If no status then we don't create an order but keep it as a cart
+                rows.push({
+                  index: index + 1,
+                  data: row,
+                  success: true,
+                  warnings: warnings.length > 0 ? warnings : undefined,
+                });
+                toast.success(`Processed (cart created): ${cartId} for ${email}`);
+                continue;
+              }
 
               // Determine order flow based on etat
               const { stateId } = getOrderFlow(etat);

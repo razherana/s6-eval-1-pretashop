@@ -1,5 +1,5 @@
 // src/pages/frontoffice/home/components/CheckoutFormComponent.tsx
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,8 +8,11 @@ import { useCart } from '@/hooks/useCart';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useFrontofficeAuth } from '@/hooks/useFrontofficeAuth';
 import { processCheckout } from '../services/orderService';
-import { Loader2, CheckCircle, Package, User, UserPlus } from 'lucide-react';
+import { cartToCartItems, type UserCart } from '../services/cartService';
+import { Loader2, CheckCircle, Package, User, UserPlus, ShoppingCart, Save } from 'lucide-react';
+import { SavedCartsComponent } from './SavedCartsComponent';
 import { toast } from 'sonner';
+import type { CartItem } from '@/contexts/CartContext';
 
 interface CustomerFormData {
   firstname: string;
@@ -21,7 +24,7 @@ interface CustomerFormData {
 }
 
 export function CheckoutFormComponent() {
-  const { items, totalPrice, clearCart } = useCart();
+  const { items, totalPrice, clearCart, addToCart } = useCart();
   const { language } = useLanguage();
   const { authData } = useFrontofficeAuth();
 
@@ -45,26 +48,76 @@ export function CheckoutFormComponent() {
     totalAmount: number;
   } | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Cart selection state
+  const [checkoutMode, setCheckoutMode] = useState<'current' | 'saved'>('current');
+  const [selectedCartId, setSelectedCartId] = useState<string>('');
+  
+  // Loaded cart items state
+  const [loadedCartItems, setLoadedCartItems] = useState<CartItem[]>([]);
+  const [loadingCartItems, setLoadingCartItems] = useState(false);
+
+  const handleSelectCart = useCallback(async (cart: UserCart) => {
+    setSelectedCartId(cart.id.toString());
+    setLoadingCartItems(true);
+    
+    try {
+      const cartItems = await cartToCartItems(cart);
+      setLoadedCartItems(cartItems);
+    } catch (error) {
+      console.error('Error loading cart items:', error);
+      toast.error('Failed to load cart items');
+      setLoadedCartItems([]);
+    } finally {
+      setLoadingCartItems(false);
+    }
+  }, []);
+
+  const handleUseCart = useCallback(async (items: CartItem[]) => {
+    clearCart();
+    for (const item of items) {
+      if (item.productId) {
+        addToCart(item);
+      }
+    }
+    setCheckoutMode('current');
+    setSelectedCartId('');
+    setLoadedCartItems([]);
+    toast.success('Saved cart loaded into current cart');
+  }, [clearCart, addToCart]);
+
+  const getCartItems = useCallback((): CartItem[] => {
+    if (checkoutMode === 'saved' && selectedCartId) {
+      return loadedCartItems;
+    }
+    return items;
+  }, [checkoutMode, selectedCartId, loadedCartItems, items]);
+
+  const getDisplayTotal = useCallback((): number => {
+    if (checkoutMode === 'saved' && loadedCartItems.length > 0) {
+      return loadedCartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    }
+    return totalPrice;
+  }, [checkoutMode, loadedCartItems, totalPrice]);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (items.length === 0) {
-      toast.error('Your cart is empty');
+    const cartItems = getCartItems();
+
+    if (cartItems.length === 0) {
+      toast.error('No items to checkout');
       return;
     }
 
-    const formDataToSubmit = { ...formData };
+    const formDataToUse = { ...formData };
 
-    // If using account tab, use the authenticated user's info
     if (activeTab === 'account' && authData.user) {
-      formDataToSubmit.firstname = authData.user.firstname;
-      formDataToSubmit.lastname = authData.user.lastname;
-      formDataToSubmit.email = authData.user.email;
-
-      setFormData(formDataToSubmit);
+      formDataToUse.firstname = authData.user.firstname;
+      formDataToUse.lastname = authData.user.lastname;
+      formDataToUse.email = authData.user.email;
     }
 
-    if (!formDataToSubmit.address || !formDataToSubmit.city || !formDataToSubmit.phone) {
+    if (!formDataToUse.address || !formDataToUse.city || !formDataToUse.phone) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -73,20 +126,19 @@ export function CheckoutFormComponent() {
 
     try {
       const customerInfo: CustomerFormData = {
-        firstname: formDataToSubmit.firstname,
-        lastname: formDataToSubmit.lastname,
-        email: formDataToSubmit.email,
-        address: formDataToSubmit.address,
-        city: formDataToSubmit.city,
-        phone: formDataToSubmit.phone,
+        firstname: formDataToUse.firstname,
+        lastname: formDataToUse.lastname,
+        email: formDataToUse.email,
+        address: formDataToUse.address,
+        city: formDataToUse.city,
+        phone: formDataToUse.phone,
       };
 
       const result = await processCheckout(
-        items,
+        cartItems,
         customerInfo,
         language?.language_id || 1,
         language?.currency_id || 1,
-        // Pass existing customer ID if logged in
         activeTab === 'account' ? authData.user?.id : undefined,
       );
 
@@ -97,6 +149,7 @@ export function CheckoutFormComponent() {
       });
 
       clearCart();
+      setLoadedCartItems([]);
       toast.success('Order placed successfully!');
     } catch (error) {
       console.error('Checkout error:', error);
@@ -110,6 +163,9 @@ export function CheckoutFormComponent() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const displayItems = getCartItems();
+  const displayTotal = getDisplayTotal();
+
   if (orderSuccess) {
     return (
       <div className="text-center space-y-6 py-12">
@@ -118,15 +174,11 @@ export function CheckoutFormComponent() {
         </div>
         <h2 className="text-2xl font-bold">Order Confirmed!</h2>
         <div className="space-y-2">
-          <p className="text-muted-foreground">
-            Thank you for your order.
-          </p>
+          <p className="text-muted-foreground">Thank you for your order.</p>
           <p className="text-lg font-semibold">
             Order Reference: <span className="text-primary">{orderSuccess.reference}</span>
           </p>
-          <p className="text-sm text-muted-foreground">
-            Order ID: {orderSuccess.orderId}
-          </p>
+          <p className="text-sm text-muted-foreground">Order ID: {orderSuccess.orderId}</p>
         </div>
         <div className="bg-muted p-4 rounded-lg">
           <Package className="h-8 w-8 mx-auto mb-2 text-primary" />
@@ -162,6 +214,55 @@ export function CheckoutFormComponent() {
           </TabsTrigger>
         </TabsList>
 
+        {/* Cart Selection (only for authenticated users) */}
+        {authData.isAuthenticated && (
+          <div className="mt-4">
+            <Label>Checkout Mode</Label>
+            <div className="flex gap-2 mt-2">
+              <Button
+                type="button"
+                variant={checkoutMode === 'current' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setCheckoutMode('current');
+                  setSelectedCartId('');
+                  setLoadedCartItems([]);
+                }}
+              >
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                Current Cart
+              </Button>
+              <Button
+                type="button"
+                variant={checkoutMode === 'saved' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setCheckoutMode('saved')}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Saved Carts
+              </Button>
+            </div>
+
+            {checkoutMode === 'saved' && (
+              <div className="mt-3">
+                {loadingCartItems && (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <span className="ml-2 text-sm text-muted-foreground">
+                      Loading cart items...
+                    </span>
+                  </div>
+                )}
+                <SavedCartsComponent
+                  onSelectCart={handleSelectCart}
+                  onUseCart={handleUseCart}
+                  selectedCartId={selectedCartId}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
         <TabsContent value="guest" className="space-y-4 mt-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -187,7 +288,6 @@ export function CheckoutFormComponent() {
               />
             </div>
           </div>
-
           <div className="space-y-2">
             <Label htmlFor="email">Email *</Label>
             <Input
@@ -223,42 +323,39 @@ export function CheckoutFormComponent() {
           )}
         </TabsContent>
 
-        {/* Common fields for both tabs */}
         <div className="space-y-4 mt-4">
           <div className="space-y-2">
             <Label htmlFor="phone">Phone *</Label>
-            <Input
-              id="phone"
-              name="phone"
-              type="tel"
-              value={formData.phone}
-              onChange={handleInputChange}
-              required
-              placeholder="+261 34 12 345 67"
+            <Input 
+              id="phone" 
+              name="phone" 
+              type="tel" 
+              value={formData.phone} 
+              onChange={handleInputChange} 
+              required 
+              placeholder="+261 34 12 345 67" 
             />
           </div>
-
           <div className="space-y-2">
             <Label htmlFor="address">Address *</Label>
-            <Input
-              id="address"
-              name="address"
-              value={formData.address}
-              onChange={handleInputChange}
-              required
-              placeholder="123 Main Street"
+            <Input 
+              id="address" 
+              name="address" 
+              value={formData.address} 
+              onChange={handleInputChange} 
+              required 
+              placeholder="123 Main Street" 
             />
           </div>
-
           <div className="space-y-2">
             <Label htmlFor="city">City *</Label>
-            <Input
-              id="city"
-              name="city"
-              value={formData.city}
-              onChange={handleInputChange}
-              required
-              placeholder="Antananarivo"
+            <Input 
+              id="city" 
+              name="city" 
+              value={formData.city} 
+              onChange={handleInputChange} 
+              required 
+              placeholder="Antananarivo" 
             />
           </div>
         </div>
@@ -269,8 +366,8 @@ export function CheckoutFormComponent() {
         <h3 className="font-semibold">Order Summary</h3>
         <div className="space-y-1 text-sm">
           <div className="flex justify-between">
-            <span>Items ({items.length})</span>
-            <span>{totalPrice.toFixed(2)} €</span>
+            <span>Items ({displayItems.length})</span>
+            <span>{displayTotal.toFixed(2)} €</span>
           </div>
           <div className="flex justify-between text-green-600">
             <span>Shipping</span>
@@ -278,7 +375,7 @@ export function CheckoutFormComponent() {
           </div>
           <div className="border-t pt-2 flex justify-between font-semibold">
             <span>Total</span>
-            <span>{totalPrice.toFixed(2)} €</span>
+            <span>{displayTotal.toFixed(2)} €</span>
           </div>
         </div>
         <div className="text-xs text-muted-foreground space-y-1">
@@ -287,15 +384,15 @@ export function CheckoutFormComponent() {
           {activeTab === 'account' && authData.user && (
             <p className="text-primary">✓ Ordering as: {authData.user.email}</p>
           )}
+          {checkoutMode === 'saved' && selectedCartId && (
+            <p className="text-blue-600">✓ Using saved cart #{selectedCartId}</p>
+          )}
         </div>
       </div>
 
-      <Button type="submit" className="w-full" size="lg" disabled={loading}>
+      <Button type="submit" className="w-full" size="lg" disabled={loading || loadingCartItems}>
         {loading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Processing Order...
-          </>
+          <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing Order...</>
         ) : (
           'Place Order (Payment on Delivery)'
         )}

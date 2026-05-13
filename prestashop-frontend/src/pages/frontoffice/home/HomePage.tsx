@@ -34,6 +34,8 @@ export function HomePage() {
   const { language } = useLanguage();
   const { data } = useFrontofficeData();
   const { authData, logout } = useFrontofficeAuth();
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+
   const navigate = useNavigate();
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -57,7 +59,7 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen bg-background" style={{ width: "100%" }}>
-      <CheckoutDialogComponent />
+      <CheckoutDialogComponent isCheckoutOpen={isCheckoutOpen} setIsCheckoutOpen={setIsCheckoutOpen} />
 
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
@@ -84,7 +86,7 @@ export function HomePage() {
 
             <div className="flex items-center space-x-4">
               <SelectLanguageCurrency />
-              <CartDrawerComponent />
+              <CartDrawerComponent setIsCheckoutOpen={setIsCheckoutOpen} />
 
               {/* User Menu */}
               {authData.isAuthenticated && authData.user ? (

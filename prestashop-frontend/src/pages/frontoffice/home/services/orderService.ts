@@ -189,9 +189,9 @@ export async function getCartTotal(cartId: number): Promise<{
         associations: {
           cart_rows: {
             cart_row: Array<{
-              id_product: string | { "#text": string };
-              id_product_attribute?: string | { "#text": string };
-              quantity: string | { "#text": string };
+              id_product: { "#text": number };
+              id_product_attribute: { "#text": number };
+              quantity: number;
             }>;
           };
         };
@@ -208,21 +208,11 @@ export async function getCartTotal(cartId: number): Promise<{
 
       for (const row of rows) {
         // Extract values (they could be strings or objects with #text)
-        const productId =
-          typeof row.id_product === "object"
-            ? row.id_product["#text"]
-            : row.id_product;
+        const productId = row.id_product["#text"];
 
-        const quantity =
-          typeof row.quantity === "object"
-            ? parseInt(row.quantity["#text"])
-            : parseInt(row.quantity);
+        const quantity = row.quantity;
 
-        const productAttributeId = row.id_product_attribute
-          ? typeof row.id_product_attribute === "object"
-            ? row.id_product_attribute["#text"]
-            : row.id_product_attribute
-          : undefined;
+        const productAttributeId = row.id_product_attribute["#text"];
 
         // Fetch product price with proper combination handling
         try {
@@ -231,13 +221,13 @@ export async function getCartTotal(cartId: number): Promise<{
           });
 
           // If there's a product attribute (combination), include it
-          if (productAttributeId && productAttributeId !== "0") {
+          if (productAttributeId && productAttributeId !== 0) {
             priceParams.append(
               "price[price_ttc][product_attribute]",
-              productAttributeId,
+              productAttributeId.toString(),
             );
           } else {
-            priceParams.append("price[price_ttc]", "1");
+            priceParams.append("price[price_ttc][use_tax]", "1");
           }
 
           const productResponse = await fetchFromPrestashopApi<{
@@ -249,19 +239,18 @@ export async function getCartTotal(cartId: number): Promise<{
             method: "GET",
           });
 
-          const price = parseFloat(
-            (
-              productResponse.product?.price_ttc ||
-              productResponse.product?.price ||
-              0
-            ).toString(),
+          console.log(`Fetched product ${productId} price:`, productResponse);
+
+          const price =
+            productResponse.product.price_ttc || productResponse.product.price;
+
+          console.log(
+            `Fetched price for product ${productId}${productAttributeId ? ` (attribute ${productAttributeId})` : ""}: ${price}`,
           );
 
-          let priceHt: number = parseFloat(
-            (productResponse.product?.price || 0).toString(),
-          );
+          let priceHt: number = productResponse.product.price;
 
-          if (productAttributeId && productAttributeId !== "0") {
+          if (productAttributeId && productAttributeId !== 0) {
             // If there's a combination, we need the price impact
             const combinationResponse = await fetchFromPrestashopApi<{
               combination: {
@@ -271,9 +260,7 @@ export async function getCartTotal(cartId: number): Promise<{
               method: "GET",
             });
 
-            const priceImpact = parseFloat(
-              combinationResponse.combination?.price.toString() || "0",
-            );
+            const priceImpact = combinationResponse.combination.price;
 
             priceHt += priceImpact;
           }
@@ -285,7 +272,7 @@ export async function getCartTotal(cartId: number): Promise<{
             `Product ${productId}${productAttributeId ? ` (attribute ${productAttributeId})` : ""}: ${price} x ${quantity} = ${price * quantity}`,
           );
         } catch (error) {
-          console.warn(`Could not fetch price for product ${productId}`, error);
+          console.error(`Could not fetch price for product ${productId}`, error);
         }
       }
     }

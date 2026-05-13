@@ -302,7 +302,7 @@ export async function fetchOrders(
       { method: "GET" },
     );
 
-    if(response.orders.order) {
+    if (response.orders.order) {
       return Array.isArray(response.orders.order)
         ? response.orders.order
         : [response.orders.order];
@@ -631,7 +631,9 @@ export async function resetTaxRuleGroups(taxRuleGroupIds: number[]): Promise<{
 
   for (const id of taxRuleGroupIds) {
     try {
-      await fetchFromPrestashopApi(`/tax_rule_groups/${id}`, { method: "DELETE" });
+      await fetchFromPrestashopApi(`/tax_rule_groups/${id}`, {
+        method: "DELETE",
+      });
       console.log(`Deleted tax rule group with ID: ${id}`);
       deletedTaxRuleGroupIds.push(id);
     } catch (error) {
@@ -662,4 +664,40 @@ export async function resetTaxRules(taxRuleIds: number[]): Promise<{
   }
 
   return { deletedTaxRuleIds, failedTaxRuleIds };
+}
+
+export async function resetCarts(): Promise<{
+  deletedCartIds: number[];
+  failedCartIds: number[];
+}> {
+  const deletedCartIds: number[] = [];
+  const failedCartIds: number[] = [];
+
+  try {
+    const response = await fetchFromPrestashopApi<{
+      carts: {
+        cart: { "@_id": number }[];
+      };
+    }>(`/carts?limit=1000`, { method: "GET" });
+
+    console.log("Fetched carts for deletion:", response.carts.cart);
+
+    const carts = response.carts.cart;
+    console.log(`Fetched ${carts.length} carts for deletion.`);
+
+    for (const cart of carts) {
+      try {
+        await fetchFromPrestashopApi(`/carts/${cart["@_id"]}`, { method: "DELETE" });
+        console.log(`Deleted cart with ID: ${cart["@_id"]}`);
+        deletedCartIds.push(cart["@_id"]);
+      } catch (error) {
+        console.error("Error deleting cart:", error);
+        failedCartIds.push(cart["@_id"]);
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching carts:", error);
+  }
+
+  return { deletedCartIds, failedCartIds };
 }
