@@ -6,7 +6,6 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   getSavedCarts,
-  cartToCartItems,
   type UserCart,
 } from '../services/cartService';
 import { getCartTotal } from '../services/orderService';
@@ -14,23 +13,21 @@ import { useFrontofficeAuth } from '@/hooks/useFrontofficeAuth';
 import { useFrontofficeData } from '@/hooks/useFrontofficeData';
 import { useLanguage } from '@/hooks/useLanguage';
 import { getWithLanguage, getFormattedPrice } from '@/utils/lang';
-import { API_QUERY } from '@/utils/url';
+import { API_QUERY, fetchFromPrestashopApi } from '@/utils/url';
 import {
   ShoppingCart,
   Calendar,
   Package,
   ChevronRight,
   Loader2,
-  RefreshCw,
+  Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { CartItem } from '@/contexts/CartContext';
 import type { ProductReadXML } from '@/pages/backoffice/home/types';
+import { fetchProductCombinations } from '../services';
 
 interface SavedCartsProps {
   onSelectCart: (cart: UserCart) => void;
-  onUseCart: (items: CartItem[]) => void;
-  selectedCartId: string;
 }
 
 interface CartProductInfo {
@@ -45,8 +42,6 @@ interface CartProductInfo {
 
 export function SavedCartsComponent({
   onSelectCart,
-  onUseCart,
-  selectedCartId,
 }: SavedCartsProps) {
   const { authData } = useFrontofficeAuth();
   const { data } = useFrontofficeData();
@@ -80,21 +75,17 @@ export function SavedCartsComponent({
     }
   }, [authData]);
 
+
+
   const loadCartDetails = async (cartId: number) => {
     if (cartProducts.has(cartId)) return;
 
     setLoadingProducts((prev) => new Set(prev).add(cartId));
 
     try {
-      // Get cart total
       const total = await getCartTotal(cartId);
-      setCartTotals((prev) => {
-        const a = new Map(prev).set(cartId, total);
-        console.log('Updated cart totals:', a);
-        return a;
-      });
+      setCartTotals((prev) => new Map(prev).set(cartId, total));
 
-      // Get cart products
       const cart = savedCarts.find((c) => c.id === cartId);
       if (!cart) return;
 
@@ -109,42 +100,53 @@ export function SavedCartsComponent({
         const quantity = row.quantity;
         const combinationId = row.id_product_attribute["#text"];
 
-        // Get product info from frontoffice data
-        const product = data.products.find((p) => p.id === productId);
+        try {
+          const productResponse = await fetchFromPrestashopApi<{
+            product: ProductReadXML;
+          }>(`/products/${productId}?price[price_ttc][use_tax]=1${combinationId ? `&price[price_ttc][product_attribute]=${combinationId}` : ''}`, { method: 'GET' });
 
-        let combinationName: string | undefined;
-        if (combinationId && combinationId !== 0) {
-          const combinations = data.combinationsCache.get(productId);
-          if (combinations) {
-            const comb = combinations.find((c) => c.id === combinationId);
-            if (comb?.associations?.product_option_values?.product_option_value) {
-              const ovs = Array.isArray(
-                comb.associations.product_option_values.product_option_value
-              )
-                ? comb.associations.product_option_values.product_option_value
-                : [comb.associations.product_option_values.product_option_value];
+          const product = productResponse.product;
 
-              const names = ovs.map((ov) => {
-                const ovDetail = data.productOptionValues.get(ov.id);
-                if (ovDetail) {
-                  return getWithLanguage(ovDetail.name, language?.language_id || 1);
-                }
-                return `Option #${ov.id}`;
-              });
-              combinationName = names.join(', ');
+          if (product?.associations?.images?.image && !Array.isArray(product.associations.images.image)) {
+            product.associations.images.image = [product.associations.images.image as never];
+          }
+
+          let combinationName: string | undefined;
+          if (combinationId && combinationId !== 0 && data) {
+            const combinations = await fetchProductCombinations(productId, data.combinationsCache);
+            if (combinations) {
+              const comb = combinations.find((c) => c.id === combinationId);
+              if (comb?.associations?.product_option_values?.product_option_value) {
+                const ovs = Array.isArray(
+                  comb.associations.product_option_values.product_option_value
+                )
+                  ? comb.associations.product_option_values.product_option_value
+                  : [comb.associations.product_option_values.product_option_value];
+
+                const names = ovs.map((ov) => {
+                  const ovDetail = data.productOptionValues.get(ov.id);
+                  if (ovDetail) {
+                    return getWithLanguage(ovDetail.name, language?.language_id || 1);
+                  }
+                  return `Option #${ov.id}`;
+                });
+                combinationName = names.join(', ');
+              }
             }
           }
-        }
 
-        products.push({
-          productId,
-          combinationId: combinationId !== 0 ? combinationId : undefined,
-          quantity,
-          product,
-          combinationName,
-          price_ttc: product?.price_ttc,
-          price: product?.price,
-        });
+          products.push({
+            productId,
+            combinationId: combinationId !== 0 ? combinationId : undefined,
+            quantity,
+            product,
+            combinationName,
+            price_ttc: product?.price_ttc,
+            price: product?.price,
+          });
+        } catch (error) {
+          console.error(`Error loading product ${productId}:`, error);
+        }
       }
 
       setCartProducts((prev) => new Map(prev).set(cartId, products));
@@ -166,17 +168,6 @@ export function SavedCartsComponent({
       setExpandedCartId(cart.id.toString());
       loadCartDetails(cart.id);
     }
-  };
-
-  const handleSelectCart = (cart: UserCart) => {
-    onSelectCart(cart);
-  };
-
-  const handleUseCartItems = (cart: UserCart) => {
-    cartToCartItems(cart).then((items) => {
-      onUseCart(items);
-      toast.success(`Loaded ${items.length} items from saved cart`);
-    });
   };
 
   if (loading) {
@@ -208,17 +199,12 @@ export function SavedCartsComponent({
     <div className="space-y-3">
       {savedCarts.map((cart) => {
         const isExpanded = expandedCartId === cart.id.toString();
-        const isSelected = selectedCartId === cart.id.toString();
         const products = cartProducts.get(cart.id);
         const total = cartTotals.get(cart.id);
         const isLoading = loadingProducts.has(cart.id);
 
         return (
-          <Card
-            key={cart.id}
-            className={`transition-all ${isSelected ? 'ring-2 ring-primary' : ''
-              }`}
-          >
+          <Card key={cart.id} className="transition-all">
             <CardContent className="p-0">
               {/* Cart Header */}
               <div
@@ -231,26 +217,18 @@ export function SavedCartsComponent({
                       <ShoppingCart className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <h4 className="font-medium">
-                        Cart #{cart.id}
-                      </h4>
+                      <h4 className="font-medium">Cart #{cart.id}</h4>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Calendar className="h-3 w-3" />
                         {new Date(cart.date_add).toLocaleDateString(
                           language?.locale || 'en-US',
-                          {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          }
+                          { year: 'numeric', month: 'short', day: 'numeric' }
                         )}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {isLoading && (
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    )}
+                    {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
                     {total && (
                       <span className="text-sm font-semibold">
                         {getFormattedPrice(
@@ -261,10 +239,7 @@ export function SavedCartsComponent({
                         )}
                       </span>
                     )}
-                    <ChevronRight
-                      className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''
-                        }`}
-                    />
+                    <ChevronRight className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                   </div>
                 </div>
               </div>
@@ -291,12 +266,11 @@ export function SavedCartsComponent({
                         {products.map((product, index) => (
                           <div key={index}>
                             <div className="flex items-start gap-3">
-                              {/* Product Image */}
                               <div className="h-12 w-12 shrink-0 rounded overflow-hidden bg-gray-100">
                                 {product.product?.associations?.images?.image?.[0] ? (
                                   <img
                                     src={`${product.product.associations.images.image[0]['@_xlink:href']}?${API_QUERY}`}
-                                    alt={product.product.name ? getWithLanguage(product.product.name, language?.language_id || 1) : ''}
+                                    alt=""
                                     className="h-full w-full object-cover"
                                   />
                                 ) : (
@@ -305,8 +279,6 @@ export function SavedCartsComponent({
                                   </div>
                                 )}
                               </div>
-
-                              {/* Product Info */}
                               <div className="flex-1 min-w-0">
                                 <h5 className="text-sm font-medium truncate">
                                   {product.product?.name
@@ -314,89 +286,48 @@ export function SavedCartsComponent({
                                     : `Product #${product.productId}`}
                                 </h5>
                                 {product.combinationName && (
-                                  <p className="text-xs text-primary mt-0.5">
-                                    {product.combinationName}
-                                  </p>
+                                  <p className="text-xs text-primary mt-0.5">{product.combinationName}</p>
                                 )}
                                 <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                                   <span>Qty: {product.quantity}</span>
-                                  {product.price_ttc && (
+                                  {product.price_ttc ? (
                                     <span>
-                                      {getFormattedPrice(
-                                        product.price_ttc,
-                                        language?.currency || '€',
-                                        language?.conversion_change || 1,
-                                        language?.locale || 'en-US'
-                                      )}
+                                      {getFormattedPrice(product.price_ttc, language?.currency || '€', language?.conversion_change || 1, language?.locale || 'en-US')}
                                     </span>
-                                  )}
+                                  ) : null}
                                 </div>
                               </div>
                             </div>
-                            {index < products.length - 1 && (
-                              <Separator className="mt-3" />
-                            )}
+                            {index < products.length - 1 && <Separator className="mt-3" />}
                           </div>
                         ))}
-
-                        {/* Total */}
                         {total && (
                           <div className="pt-2 border-t">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">Total (excl. tax)</span>
-                              <span>
-                                {getFormattedPrice(
-                                  total.total,
-                                  language?.currency || '€',
-                                  language?.conversion_change || 1,
-                                  language?.locale || 'en-US'
-                                )}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-sm font-semibold mt-1">
+                            <div className="flex justify-between text-sm font-semibold">
                               <span>Total (incl. tax)</span>
                               <span>
-                                {getFormattedPrice(
-                                  total.total_wt,
-                                  language?.currency || '€',
-                                  language?.conversion_change || 1,
-                                  language?.locale || 'en-US'
-                                )}
+                                {getFormattedPrice(total.total_wt, language?.currency || '€', language?.conversion_change || 1, language?.locale || 'en-US')}
                               </span>
                             </div>
                           </div>
                         )}
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        No products in this cart
-                      </p>
+                      <p className="text-sm text-muted-foreground text-center py-4">No products in this cart</p>
                     )}
 
-                    {/* Actions */}
-                    <div className="flex gap-2 mt-4">
+                    {/* Single action button */}
+                    <div className="mt-4">
                       <Button
                         size="sm"
-                        variant={isSelected ? 'default' : 'outline'}
-                        className="flex-1"
+                        className="w-full"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleSelectCart(cart);
+                          onSelectCart(cart);
                         }}
                       >
-                        {isSelected ? 'Selected' : 'Add to Cart'}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleUseCartItems(cart);
-                        }}
-                      >
-                        <RefreshCw className="h-3 w-3 mr-1" />
-                        Use this Cart
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add to Current Cart
                       </Button>
                     </div>
                   </div>

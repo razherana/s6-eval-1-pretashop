@@ -28,7 +28,10 @@ export interface ProductReadXML {
               "@_xlink:href": string;
             },
           ]
-        | [];
+        | {
+            id: number;
+            "@_xlink:href": string;
+          };
     };
     combinations: {
       combination?:

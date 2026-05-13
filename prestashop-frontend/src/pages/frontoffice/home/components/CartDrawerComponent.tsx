@@ -91,7 +91,7 @@ export function CartDrawerComponent({
           </div>
         ) : (
           <>
-            <ScrollArea className="flex-1 pr-4">
+            <ScrollArea className="flex-1 px-4">
               <div className="space-y-4 py-4">
                 {items.map((item) => (
                   <div
@@ -179,7 +179,7 @@ export function CartDrawerComponent({
             <Separator />
 
             {/* Cart Footer */}
-            <div className="space-y-4 pt-4">
+            <div className="space-y-4 py-5 px-5">
               <div className="flex items-center justify-between text-lg font-semibold">
                 <span>Total</span>
                 <span>${totalPrice.toFixed(2)}</span>

@@ -12,7 +12,6 @@ import { cartToCartItems, type UserCart } from '../services/cartService';
 import { Loader2, CheckCircle, Package, User, UserPlus, ShoppingCart, Save } from 'lucide-react';
 import { SavedCartsComponent } from './SavedCartsComponent';
 import { toast } from 'sonner';
-import type { CartItem } from '@/contexts/CartContext';
 
 interface CustomerFormData {
   firstname: string;
@@ -50,61 +49,32 @@ export function CheckoutFormComponent() {
 
   // Cart selection state
   const [checkoutMode, setCheckoutMode] = useState<'current' | 'saved'>('current');
-  const [selectedCartId, setSelectedCartId] = useState<string>('');
-  
-  // Loaded cart items state
-  const [loadedCartItems, setLoadedCartItems] = useState<CartItem[]>([]);
   const [loadingCartItems, setLoadingCartItems] = useState(false);
 
   const handleSelectCart = useCallback(async (cart: UserCart) => {
-    setSelectedCartId(cart.id.toString());
     setLoadingCartItems(true);
     
     try {
       const cartItems = await cartToCartItems(cart);
-      setLoadedCartItems(cartItems);
+      for (const item of cartItems) {
+        if (item.productId) {
+          addToCart(item, item.quantity);
+        }
+      }
+      setCheckoutMode('current');
+      toast.success(`Added ${cartItems.length} items from saved cart #${cart.id}`);
     } catch (error) {
       console.error('Error loading cart items:', error);
       toast.error('Failed to load cart items');
-      setLoadedCartItems([]);
     } finally {
       setLoadingCartItems(false);
     }
-  }, []);
-
-  const handleUseCart = useCallback(async (items: CartItem[]) => {
-    clearCart();
-    for (const item of items) {
-      if (item.productId) {
-        addToCart(item);
-      }
-    }
-    setCheckoutMode('current');
-    setSelectedCartId('');
-    setLoadedCartItems([]);
-    toast.success('Saved cart loaded into current cart');
-  }, [clearCart, addToCart]);
-
-  const getCartItems = useCallback((): CartItem[] => {
-    if (checkoutMode === 'saved' && selectedCartId) {
-      return loadedCartItems;
-    }
-    return items;
-  }, [checkoutMode, selectedCartId, loadedCartItems, items]);
-
-  const getDisplayTotal = useCallback((): number => {
-    if (checkoutMode === 'saved' && loadedCartItems.length > 0) {
-      return loadedCartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    }
-    return totalPrice;
-  }, [checkoutMode, loadedCartItems, totalPrice]);
+  }, [addToCart]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const cartItems = getCartItems();
-
-    if (cartItems.length === 0) {
+    if (items.length === 0) {
       toast.error('No items to checkout');
       return;
     }
@@ -135,7 +105,7 @@ export function CheckoutFormComponent() {
       };
 
       const result = await processCheckout(
-        cartItems,
+        items,
         customerInfo,
         language?.language_id || 1,
         language?.currency_id || 1,
@@ -149,7 +119,6 @@ export function CheckoutFormComponent() {
       });
 
       clearCart();
-      setLoadedCartItems([]);
       toast.success('Order placed successfully!');
     } catch (error) {
       console.error('Checkout error:', error);
@@ -162,9 +131,6 @@ export function CheckoutFormComponent() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
-
-  const displayItems = getCartItems();
-  const displayTotal = getDisplayTotal();
 
   if (orderSuccess) {
     return (
@@ -223,11 +189,7 @@ export function CheckoutFormComponent() {
                 type="button"
                 variant={checkoutMode === 'current' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => {
-                  setCheckoutMode('current');
-                  setSelectedCartId('');
-                  setLoadedCartItems([]);
-                }}
+                onClick={() => setCheckoutMode('current')}
               >
                 <ShoppingCart className="mr-2 h-4 w-4" />
                 Current Cart
@@ -255,8 +217,6 @@ export function CheckoutFormComponent() {
                 )}
                 <SavedCartsComponent
                   onSelectCart={handleSelectCart}
-                  onUseCart={handleUseCart}
-                  selectedCartId={selectedCartId}
                 />
               </div>
             )}
@@ -366,8 +326,8 @@ export function CheckoutFormComponent() {
         <h3 className="font-semibold">Order Summary</h3>
         <div className="space-y-1 text-sm">
           <div className="flex justify-between">
-            <span>Items ({displayItems.length})</span>
-            <span>{displayTotal.toFixed(2)} €</span>
+            <span>Items ({items.length})</span>
+            <span>{totalPrice.toFixed(2)} €</span>
           </div>
           <div className="flex justify-between text-green-600">
             <span>Shipping</span>
@@ -375,7 +335,7 @@ export function CheckoutFormComponent() {
           </div>
           <div className="border-t pt-2 flex justify-between font-semibold">
             <span>Total</span>
-            <span>{displayTotal.toFixed(2)} €</span>
+            <span>{totalPrice.toFixed(2)} €</span>
           </div>
         </div>
         <div className="text-xs text-muted-foreground space-y-1">
@@ -384,13 +344,10 @@ export function CheckoutFormComponent() {
           {activeTab === 'account' && authData.user && (
             <p className="text-primary">✓ Ordering as: {authData.user.email}</p>
           )}
-          {checkoutMode === 'saved' && selectedCartId && (
-            <p className="text-blue-600">✓ Using saved cart #{selectedCartId}</p>
-          )}
         </div>
       </div>
 
-      <Button type="submit" className="w-full" size="lg" disabled={loading || loadingCartItems}>
+      <Button type="submit" className="w-full" size="lg" disabled={loading}>
         {loading ? (
           <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing Order...</>
         ) : (
