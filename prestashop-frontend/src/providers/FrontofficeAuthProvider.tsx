@@ -107,6 +107,12 @@ export function FrontofficeAuthProvider({
     }
   };
 
+  const loginAsCustomer = async (customer: CustomerReadXML) => {
+    localStorage.setItem("frontoffice_user", JSON.stringify(customer));
+    setUser(customer);
+    setIsAuthenticated(true);
+  }
+
   const logout = () => {
     localStorage.removeItem("frontoffice_user");
     setUser(null);
@@ -114,7 +120,7 @@ export function FrontofficeAuthProvider({
   };
 
   return (
-    <FrontofficeAuthContext.Provider value={{ authData: data, login, logout }}>
+    <FrontofficeAuthContext.Provider value={{ authData: data, login, logout, loginAsCustomer }}>
       {children}
     </FrontofficeAuthContext.Provider>
   );

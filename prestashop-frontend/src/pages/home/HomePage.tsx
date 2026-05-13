@@ -105,7 +105,7 @@ export function HomePage() {
             <CardFooter className="flex justify-center pb-6">
               <Button
                 size="lg"
-                onClick={() => navigate("/frontoffice/home")}
+                onClick={() => navigate("/frontoffice/login")}
                 className="group"
               >
                 Go to Frontoffice Home
