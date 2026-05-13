@@ -56,7 +56,7 @@ export function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" style={{ width: "100%" }}>
       <CheckoutDialogComponent />
 
       {/* Header */}
@@ -132,7 +132,7 @@ export function HomePage() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 w-full">
         <section className="mb-12">
           <div className="relative overflow-hidden rounded-2xl bg-linear-to-r from-primary to-primary/60 p-8 md:p-12 text-white">
             <div className="relative z-10 max-w-2xl">
