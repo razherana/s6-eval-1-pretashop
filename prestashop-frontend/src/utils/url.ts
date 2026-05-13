@@ -20,8 +20,6 @@ export async function fetchFromPrestashopApi<T = unknown>(
 
   const data = await response.text();
 
-  console.log("Fetched XML data from PrestaShop API:", data);
-
   return readXml<T>(data);
 }
 

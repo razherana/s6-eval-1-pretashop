@@ -9,17 +9,9 @@ import { customerSchema } from "@/schemas/customer";
 import { orderHistorySchema } from "@/schemas/orderHistory";
 import { orderPaymentSchema } from "@/schemas/orderPayment";
 import type { CartItem } from "@/contexts/CartContext";
+import { ORDER_STATES } from "@/pages/backoffice/home/types";
 
 const COUNTRY_ID = 8;
-
-// Order states
-export const ORDER_STATES = {
-  AWAITING_CASH_ON_DELIVERY: 13, // Awaiting Cash On Delivery validation
-  SHIPPED: 4, // Shipped
-  DELIVERED: 5, // Delivered
-  PAYMENT_ACCEPTED: 2, // Payment accepted
-} as const;
-
 export interface GuestCustomer {
   id: number;
   firstname: string;

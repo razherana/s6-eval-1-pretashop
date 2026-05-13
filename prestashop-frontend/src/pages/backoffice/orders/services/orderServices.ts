@@ -1,19 +1,12 @@
 import { fetchFromPrestashopApi } from "@/utils/url";
-import type {
-  OrderReadXML,
-  OrderDetailReadXML,
-  OrderStateXML,
+import {
+  type OrderReadXML,
+  type OrderDetailReadXML,
+  type OrderStateXML,
+  ORDER_STATES,
 } from "../../home/types";
 import { PrestaShopXMLConverter } from "@/utils/xml";
 import { toast } from "sonner";
-
-// Order states
-export const ORDER_STATES = {
-  AWAITING_CASH_ON_DELIVERY: 13,
-  SHIPPED: 4,
-  DELIVERED: 5,
-  PAYMENT_ACCEPTED: 2,
-} as const;
 
 // Fetch all orders with pagination
 export async function fetchAllOrders(

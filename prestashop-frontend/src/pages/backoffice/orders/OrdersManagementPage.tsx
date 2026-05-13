@@ -374,7 +374,7 @@ export function OrdersManagementPage() {
                           <TableCell>{order.payment}</TableCell>
                           <TableCell className="font-medium">
                             {getFormattedPrice(
-                              order.total_paid,
+                              order.total_paid_tax_incl,
                               language.currency,
                               language.conversion_change,
                               language.locale

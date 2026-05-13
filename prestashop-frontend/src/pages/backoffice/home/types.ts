@@ -1,3 +1,12 @@
+export const ORDER_STATES = {
+  AWAITING_CASH_ON_DELIVERY: 13, // Awaiting Cash On Delivery validation
+  SHIPPED: 4, // Shipped
+  DELIVERED: 5, // Delivered
+  PAYMENT_ACCEPTED: 2, // Payment accepted
+  CANCELED: 6,
+  PAYMENT_ERROR: 8,
+} as const;
+
 export interface LanguageField {
   language: [
     {
@@ -84,6 +93,7 @@ export interface OrderReadXML {
   id: number;
   reference: string;
   total_paid: number;
+  total_paid_tax_incl: number;
   payment: string;
   current_state: {
     "#text": number;

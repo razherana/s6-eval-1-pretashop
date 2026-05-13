@@ -203,7 +203,8 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
         fileStates.customers!,
         delimiter,
         decimalSeparator,
-        languageIds
+        languageIds,
+        language
       );
 
       progressInterval = setInterval(() => {
