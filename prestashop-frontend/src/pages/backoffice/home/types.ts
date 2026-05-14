@@ -106,6 +106,7 @@ export interface OrderReadXML {
   id_customer: {
     "#text": number;
   };
+  date_add: string;
 
   // Not an association but manually added in the code after fetching order details
   order_details?: OrderDetailReadXML[];

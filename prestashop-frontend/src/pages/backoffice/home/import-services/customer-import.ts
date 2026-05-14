@@ -23,6 +23,7 @@ import {
   type OrderReadXML,
 } from "../types";
 import { parse } from "date-fns";
+import { utc } from "@date-fns/utc";
 import type { LanguageData } from "@/contexts/LanguageContext";
 import { orderInvoiceSchema } from "@/schemas/orderInvoice";
 
@@ -1007,7 +1008,9 @@ export async function importCustomersFromFile(
                 0,
               );
 
-              const date_add = parse(date, "dd/MM/yyyy", new Date());
+              const date_add = parse(date, "dd/MM/yyyy", new Date(), {
+                in: utc,
+              });
               date_add.setHours(0, 0, 0); // Set to 00:00 for consistency
 
               const date_add_str = date_add

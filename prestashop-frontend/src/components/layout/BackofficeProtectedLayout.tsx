@@ -3,7 +3,7 @@ import { useBackofficeAuth } from "@/hooks/useBackofficeAuth";
 import { SidebarProvider } from "../ui/sidebar";
 import { DashboardSidebar } from "../ui-manual/backoffice-sidebar";
 import type { Route } from "../ui-manual/backoffice-nav-main";
-import { ClipboardList, Home } from "lucide-react";
+import { ChartNoAxesColumn, ClipboardList, Home } from "lucide-react";
 
 const routes: Route[] = [
   {
@@ -13,12 +13,17 @@ const routes: Route[] = [
     icon: <Home className="size-4" />,
   },
   {
+    id: "dashboard",
+    title: "Dashboard",
+    link: "/backoffice/dashboard",
+    icon: <ChartNoAxesColumn className="size-4" />,
+  },
+  {
     id: "orders",
     title: "Orders",
     link: "/backoffice/orders",
     icon: <ClipboardList className="size-4" />,
   },
-
 ];
 
 export function BackofficeProtectedLayout() {

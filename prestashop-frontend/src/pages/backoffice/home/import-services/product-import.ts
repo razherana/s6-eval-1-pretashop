@@ -14,6 +14,7 @@ import type { CategoryReadXML } from "../types";
 import { parse } from "date-fns";
 
 import numeral from "numeral";
+import { utc } from "@date-fns/utc";
 
 // Import step 1
 interface CategoryMap {
@@ -361,7 +362,7 @@ export async function importProductsFromFile(
           (numeral(row.prix_ttc || "0").value() || 0) /
           (1 + (taxMap[cleanTax]?.taxId ? parseFloat(cleanTax) / 100 : 0))
         ).toFixed(6),
-        available_date: parse(row.date_availability_produit, "dd/MM/yyyy", new Date())
+        available_date: parse(row.date_availability_produit, "dd/MM/yyyy", new Date(), { in: utc })
           .toISOString()
           .split("T")[0],
         reference: row.reference || "",
