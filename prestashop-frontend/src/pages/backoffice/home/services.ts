@@ -9,6 +9,8 @@ import type {
   TaxReadXML,
   TaxRuleGroupReadXML,
   TaxRuleReadXML,
+  OrderPaymentReadXML,
+  OrderHistoryXML,
 } from "./types";
 import { PrestaShopXMLConverter } from "@/utils/xml";
 
@@ -314,6 +316,35 @@ export async function fetchOrders(
   }
 }
 
+export async function fetchOrderPayments(
+  limit: number = 100,
+  offset: number = 0,
+): Promise<OrderPaymentReadXML[]> {
+  const query = new URLSearchParams({
+    display: "full",
+    limit: limit.toString(),
+    offset: offset.toString(),
+  });
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await fetchFromPrestashopApi<any>(
+      `/order_payments?${query.toString()}`,
+      { method: "GET" },
+    );
+
+    if (response.order_payments.order_payment) {
+      return Array.isArray(response.order_payments.order_payment)
+        ? response.order_payments.order_payment
+        : [response.order_payments.order_payment];
+    }
+    return [];
+  } catch (error) {
+    console.error("Error fetching order payments:", error);
+    throw error;
+  }
+}
+
 export async function fetchOrderDetails(
   orderId: number,
 ): Promise<OrderDetailReadXML[]> {
@@ -331,6 +362,35 @@ export async function fetchOrderDetails(
     return response.order_details.order_detail;
   } catch (error) {
     console.error("Error fetching order details:", error);
+    throw error;
+  }
+}
+
+export async function fetchOrderHistories(
+  limit: number = 100,
+  offset: number = 0,
+): Promise<OrderHistoryXML[]> {
+  const query = new URLSearchParams({
+    display: "full",
+    limit: limit.toString(),
+    offset: offset.toString(),
+  });
+
+  try {
+    const response = await fetchFromPrestashopApi<{
+      order_histories: {
+        order_history: OrderHistoryXML[];
+      };
+    }>(`/order_histories?${query.toString()}`, { method: "GET" });
+
+    if (response.order_histories.order_history) {
+      return Array.isArray(response.order_histories.order_history)
+        ? response.order_histories.order_history
+        : [response.order_histories.order_history];
+    }
+    return [];
+  } catch (error) {
+    console.error("Error fetching order histories:", error);
     throw error;
   }
 }
@@ -470,6 +530,52 @@ export async function resetOrders(orderIds: number[]): Promise<{
   }
 
   return { deletedOrderIds, failedOrderIds };
+}
+
+export async function resetOrderPayments(orderPaymentIds: number[]): Promise<{
+  deletedOrderPaymentIds: number[];
+  failedOrderPaymentIds: number[];
+}> {
+  const deletedOrderPaymentIds: number[] = [];
+  const failedOrderPaymentIds: number[] = [];
+
+  for (const id of orderPaymentIds) {
+    try {
+      await fetchFromPrestashopApi(`/order_payments/${id}`, {
+        method: "DELETE",
+      });
+      console.log(`Deleted order payment with ID: ${id}`);
+      deletedOrderPaymentIds.push(Number(id));
+    } catch (error) {
+      console.error("Error deleting order payment:", error);
+      failedOrderPaymentIds.push(Number(id));
+    }
+  }
+
+  return { deletedOrderPaymentIds, failedOrderPaymentIds };
+}
+
+export async function resetOrderHistories(orderHistoryIds: number[]): Promise<{
+  deletedOrderHistoryIds: number[];
+  failedOrderHistoryIds: number[];
+}> {
+  const deletedOrderHistoryIds: number[] = [];
+  const failedOrderHistoryIds: number[] = [];
+
+  for (const id of orderHistoryIds) {
+    try {
+      await fetchFromPrestashopApi(`/order_histories/${id}`, {
+        method: "DELETE",
+      });
+      console.log(`Deleted order history with ID: ${id}`);
+      deletedOrderHistoryIds.push(id);
+    } catch (error) {
+      console.error("Error deleting order history:", error);
+      failedOrderHistoryIds.push(id);
+    }
+  }
+
+  return { deletedOrderHistoryIds, failedOrderHistoryIds };
 }
 
 export async function resetCustomers(customerIds: number[]): Promise<{
@@ -687,7 +793,9 @@ export async function resetCarts(): Promise<{
 
     for (const cart of carts) {
       try {
-        await fetchFromPrestashopApi(`/carts/${cart["@_id"]}`, { method: "DELETE" });
+        await fetchFromPrestashopApi(`/carts/${cart["@_id"]}`, {
+          method: "DELETE",
+        });
         console.log(`Deleted cart with ID: ${cart["@_id"]}`);
         deletedCartIds.push(cart["@_id"]);
       } catch (error) {
