@@ -11,6 +11,7 @@ import {
   parseCsvFile,
 } from "../services";
 import type { CategoryReadXML } from "../types";
+import { parse } from "date-fns";
 
 import numeral from "numeral";
 
@@ -361,6 +362,9 @@ export async function importProductsFromFile(
           (numeral(row.prix_ttc || "0").value() || 0) /
           (1 + (taxMap[cleanTax]?.taxId ? parseFloat(cleanTax) / 100 : 0))
         ).toFixed(6),
+        available_date: parse(row.available_date, "dd/MM/yyyy", new Date())
+          .toISOString()
+          .split("T")[0],
         reference: row.reference || "",
         state: "1",
         active: "1",
