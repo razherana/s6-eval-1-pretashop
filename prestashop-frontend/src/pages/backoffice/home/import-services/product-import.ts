@@ -354,7 +354,6 @@ export async function importProductsFromFile(
 
       // Map CSV fields to schema fields
       const productData: Record<string, string> = {
-        ...row,
         wholesale_price: (numeral(row.prix_achat || "0").value() || 0).toFixed(
           6,
         ),
@@ -362,7 +361,7 @@ export async function importProductsFromFile(
           (numeral(row.prix_ttc || "0").value() || 0) /
           (1 + (taxMap[cleanTax]?.taxId ? parseFloat(cleanTax) / 100 : 0))
         ).toFixed(6),
-        available_date: parse(row.available_date, "dd/MM/yyyy", new Date())
+        available_date: parse(row.date_availability_produit, "dd/MM/yyyy", new Date())
           .toISOString()
           .split("T")[0],
         reference: row.reference || "",
