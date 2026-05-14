@@ -10,27 +10,24 @@ import { FrontofficeAuthProvider } from './providers/FrontofficeAuthProvider.tsx
 import { CartProvider } from './providers/CartProvider.tsx';
 import { FrontofficeDataProvider } from './providers/FrontofficeDataProvider.tsx';
 import { TooltipProvider } from './components/ui/tooltip.tsx';
-import { StrictMode } from 'react';
 
 const router = createBrowserRouter(mainRoutes);
 
 createRoot(document.getElementById('root')!).render(
   <>
-    <StrictMode>
-      <Toaster position="top-right" />
-      <TooltipProvider>
-        <LanguageProvider initialLanguageId={DATABASE_LANGUAGE_ID} initialCurrencyId={DATABASE_CURRENCY_ID}>
-          <BackofficeAuthProvider>
-            <FrontofficeAuthProvider>
-              <FrontofficeDataProvider>
-                <CartProvider>
-                  <RouterProvider router={router} />
-                </CartProvider>
-              </FrontofficeDataProvider>
-            </FrontofficeAuthProvider>
-          </BackofficeAuthProvider>
-        </LanguageProvider>
-      </TooltipProvider>
-    </StrictMode>
+    <Toaster position="top-right" />
+    <TooltipProvider>
+      <LanguageProvider initialLanguageId={DATABASE_LANGUAGE_ID} initialCurrencyId={DATABASE_CURRENCY_ID}>
+        <BackofficeAuthProvider>
+          <FrontofficeAuthProvider>
+            <FrontofficeDataProvider>
+              <CartProvider>
+                <RouterProvider router={router} />
+              </CartProvider>
+            </FrontofficeDataProvider>
+          </FrontofficeAuthProvider>
+        </BackofficeAuthProvider>
+      </LanguageProvider>
+    </TooltipProvider>
   </>,
 )

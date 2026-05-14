@@ -4,6 +4,11 @@ import type { DataXmlApiSchema, XmlApiSchema } from "@/utils/xml";
 const dataSchema: DataXmlApiSchema = {
   rootTag: "cart",
   fields: {
+    id: {
+      xmlTag: "id",
+      type: "simple",
+      attributes: {},
+    },
     id_cart: {
       xmlTag: "id",
       type: "simple",
@@ -121,6 +126,7 @@ export const cartSchema: XmlApiSchema = {
     toCartRows: (container, csvValue, _rowData) => {
       console.log("Transforming cart_rows CSV:", csvValue);
       const rows = csvValue.split(";").filter((row) => row.trim());
+
       for (const row of rows) {
         const [id_product, id_product_attribute, quantity] = row
           .split(",")

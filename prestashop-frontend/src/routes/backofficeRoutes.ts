@@ -1,3 +1,5 @@
+// src/routes/backofficeRoutes.ts
+
 import type { RouteObject } from "react-router-dom";
 
 export const backofficeRoutes: RouteObject[] = [

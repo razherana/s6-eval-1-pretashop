@@ -4,6 +4,10 @@ import type { DataXmlApiSchema, XmlApiSchema } from "@/utils/xml";
 const dataSchema: DataXmlApiSchema = {
   rootTag: "order_payment",
   fields: {
+    id: {
+      xmlTag: "id",
+      type: "simple",
+    },
     order_reference: {
       xmlTag: "order_reference",
       type: "simple",

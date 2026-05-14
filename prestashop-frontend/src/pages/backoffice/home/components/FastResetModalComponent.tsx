@@ -6,8 +6,8 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, AlertTriangle, CheckCircle2, XCircle, Zap, Package, ShoppingCart, Users, FolderTree, Percent, Layers, Ruler, ClipboardList, CreditCard, History } from "lucide-react";
-import { fetchProducts, fetchOrders, fetchCustomers, fetchCategories, fetchTaxes, fetchTaxRuleGroups, fetchTaxRules, fetchOrderPayments, fetchOrderHistories, resetProducts, resetOrders, resetCustomers, resetCategories, resetTaxes, resetTaxRuleGroups, resetTaxRules, resetCarts, resetOrderPayments, resetOrderHistories } from "../services";
+import { Loader2, AlertTriangle, CheckCircle2, XCircle, Zap, Package, ShoppingCart, Users, FolderTree, Percent, Layers, Ruler, ClipboardList, CreditCard, History, FileText } from "lucide-react";
+import { fetchProducts, fetchOrders, fetchCustomers, fetchCategories, fetchTaxes, fetchTaxRuleGroups, fetchTaxRules, fetchOrderPayments, fetchOrderHistories, fetchOrderInvoices, resetProducts, resetOrders, resetCustomers, resetCategories, resetTaxes, resetTaxRuleGroups, resetTaxRules, resetCarts, resetOrderPayments, resetOrderHistories, resetOrderInvoices } from "../services";
 import { toast } from "sonner";
 
 interface FastResetModalProps {
@@ -33,6 +33,7 @@ const STEPS = [
   { id: 'taxes', label: 'Taxes', icon: <Percent className="h-4 w-4" /> },
   { id: 'order_payments', label: 'Order Payments', icon: <CreditCard className="h-4 w-4" /> },
   { id: 'order_histories', label: 'Order Histories', icon: <History className="h-4 w-4" /> },
+  { id: 'order_invoices', label: 'Order Invoices', icon: <FileText className="h-4 w-4" /> },
   { id: 'orders', label: 'Orders', icon: <ClipboardList className="h-4 w-4" /> },
   { id: 'carts', label: 'Carts', icon: <ShoppingCart className="h-4 w-4" /> },
   { id: 'customers', label: 'Customers', icon: <Users className="h-4 w-4" /> },
@@ -123,65 +124,78 @@ export function FastResetModalComponent({ open, setOpen, onResetComplete }: Fast
         failed: orderHistoryResult.failedOrderHistoryIds.length
       });
 
-      // Step 6: Orders
+      // Step 6: Order Invoices (depend on orders, so delete first)
       setCurrentStepIndex(5);
       updateStep(5, { status: 'running' });
+      const orderInvoices = await fetchOrderInvoices(1000, 0);
+      updateStep(5, { total: orderInvoices.length });
+      const orderInvoiceIds = orderInvoices.map(oi => oi.id);
+      const orderInvoiceResult = await resetOrderInvoices(orderInvoiceIds);
+      updateStep(5, {
+        status: orderInvoiceResult.failedOrderInvoiceIds.length === 0 ? 'success' : 'failed',
+        deleted: orderInvoiceResult.deletedOrderInvoiceIds.length,
+        failed: orderInvoiceResult.failedOrderInvoiceIds.length
+      });
+
+      // Step 7: Orders
+      setCurrentStepIndex(6);
+      updateStep(6, { status: 'running' });
       const orders = await fetchOrders(1000, 0);
-      updateStep(5, { total: orders.length });
+      updateStep(6, { total: orders.length });
       const orderIds = orders.map(o => o.id);
       const orderResult = await resetOrders(orderIds);
-      updateStep(5, {
+      updateStep(6, {
         status: orderResult.failedOrderIds.length === 0 ? 'success' : 'failed',
         deleted: orderResult.deletedOrderIds.length,
         failed: orderResult.failedOrderIds.length
       });
 
-      // Step 7: Carts
-      setCurrentStepIndex(6);
-      updateStep(6, { status: 'running' });
+      // Step 8: Carts
+      setCurrentStepIndex(7);
+      updateStep(7, { status: 'running' });
       const cartResult = await resetCarts();
-      updateStep(6, {
+      updateStep(7, {
         status: cartResult.failedCartIds.length === 0 ? 'success' : 'failed',
         deleted: cartResult.deletedCartIds.length,
         failed: cartResult.failedCartIds.length
       });
 
-      // Step 8: Customers
-      setCurrentStepIndex(7);
-      updateStep(7, { status: 'running' });
+      // Step 9: Customers
+      setCurrentStepIndex(8);
+      updateStep(8, { status: 'running' });
       const customers = await fetchCustomers(1000, 0);
-      updateStep(7, { total: customers.length });
+      updateStep(8, { total: customers.length });
       const customerIds = customers.map(c => c.id);
       const customerResult = await resetCustomers(customerIds);
-      updateStep(7, {
+      updateStep(8, {
         status: customerResult.failedCustomerIds.length === 0 ? 'success' : 'failed',
         deleted: customerResult.deletedCustomerIds.length,
         failed: customerResult.failedCustomerIds.length
       });
 
-      // Step 9: Products
-      setCurrentStepIndex(8);
-      updateStep(8, { status: 'running' });
+      // Step 10: Products
+      setCurrentStepIndex(9);
+      updateStep(9, { status: 'running' });
       const products = await fetchProducts(1000, 0);
-      updateStep(8, { total: products.length });
+      updateStep(9, { total: products.length });
       const productIds = products.map(p => p.id);
       const productResult = await resetProducts(productIds);
-      updateStep(8, {
+      updateStep(9, {
         status: productResult.failedProductIds.length === 0 ? 'success' : 'failed',
         deleted: productResult.deletedProductIds.length,
         failed: productResult.failedProductIds.length
       });
 
-      // Step 10: Categories (except id 1 and 2)
-      setCurrentStepIndex(9);
-      updateStep(9, { status: 'running' });
+      // Step 11: Categories (except id 1 and 2)
+      setCurrentStepIndex(10);
+      updateStep(10, { status: 'running' });
       const categories = await fetchCategories(1000, 0);
       const categoryIds = categories
         .filter(c => c.id !== 1 && c.id !== 2)
         .map(c => c.id);
-      updateStep(9, { total: categoryIds.length });
+      updateStep(10, { total: categoryIds.length });
       const categoryResult = await resetCategories(categoryIds);
-      updateStep(9, {
+      updateStep(10, {
         status: categoryResult.failedCategoryIds.length === 0 ? 'success' : 'failed',
         deleted: categoryResult.deletedCategoryIds.length,
         failed: categoryResult.failedCategoryIds.length
@@ -312,7 +326,7 @@ export function FastResetModalComponent({ open, setOpen, onResetComplete }: Fast
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              This will permanently delete <strong>all</strong> tax rules, tax rule groups, taxes, order payments, order histories, orders, carts, customers, products, and categories. This action cannot be undone.
+              This will permanently delete <strong>all</strong> tax rules, tax rule groups, taxes, order payments, order histories, order invoices, orders, carts, customers, products, and categories. This action cannot be undone.
             </AlertDescription>
           </Alert>
         )}

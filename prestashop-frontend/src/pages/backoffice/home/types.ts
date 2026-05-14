@@ -111,17 +111,6 @@ export interface OrderReadXML {
   order_details?: OrderDetailReadXML[];
 }
 
-export interface OrderPaymentReadXML {
-  id: number;
-  order_reference: string;
-  id_currency: number;
-  amount: number;
-  payment_method: string;
-  conversion_rate: number;
-  transaction_id: string;
-  date_add: string;
-}
-
 export interface OrderDetailReadXML {
   id: number;
   id_order: number;
@@ -168,6 +157,17 @@ export interface OrderHistoryXML {
   id_employee?: {
     "#text": number;
   };
+  date_add: string;
+}
+
+export interface OrderInvoiceXML {
+  id: number;
+  id_order: {
+    "#text": number;
+  };
+  number: string;
+  delivery_number?: string;
+  delivery_date?: string;
   date_add: string;
 }
 

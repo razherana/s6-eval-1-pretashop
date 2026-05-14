@@ -1,6 +1,6 @@
 // src/pages/backoffice/home/import-services/customer-import.ts
 import { fetchFromPrestashopApi } from "@/utils/url";
-import { PrestaShopXMLConverter } from "@/utils/xml";
+import { assureArray, PrestaShopXMLConverter } from "@/utils/xml";
 import {
   type ImportResult,
   type ImportedRow,
@@ -14,9 +14,17 @@ import { addressSchema } from "@/schemas/address";
 import { orderHistorySchema } from "@/schemas/orderHistory";
 import { orderPaymentSchema } from "@/schemas/orderPayment";
 import { toast } from "sonner";
-import { ORDER_STATES, type LanguageField } from "../types";
+import {
+  ORDER_STATES,
+  type LanguageField,
+  type OrderHistoryXML,
+  type OrderInvoiceXML,
+  type OrderPaymentXML,
+  type OrderReadXML,
+} from "../types";
 import { parse } from "date-fns";
 import type { LanguageData } from "@/contexts/LanguageContext";
+import { orderInvoiceSchema } from "@/schemas/orderInvoice";
 
 const USER_GROUP_ACCESS = [1, 2, 3];
 const COUNTRY_ID = 8;
@@ -334,7 +342,7 @@ async function createCart(
   items: Array<{ productId: number; combinationId?: number; quantity: number }>,
   customerId: number,
   addressId: number,
-  date_add?: Date,
+  date_add_to_use?: string,
 ): Promise<number> {
   const converter = new PrestaShopXMLConverter(cartSchema, "");
 
@@ -359,9 +367,7 @@ async function createCart(
     delivery_option: "{}",
     allow_seperated_package: "0",
     cart_rows: cartRowsString,
-    date_add:
-      date_add?.toISOString().slice(0, 19).replace("T", " ") ||
-      new Date().toISOString().slice(0, 19).replace("T", " "),
+    date_add: date_add_to_use,
   };
 
   const xmlData = converter.convertRowToXML(cartData);
@@ -375,7 +381,24 @@ async function createCart(
       body: xmlData,
     });
 
-    return response.cart.id;
+    const id = response.cart.id;
+
+    // Update date_add and date_upd to match the original date if provided (PrestaShop API doesn't allow setting these on creation)
+    if (date_add_to_use) {
+      const updateData = converter.convertRowToXML({
+        id: id.toString(),
+        date_add: date_add_to_use,
+        date_upd: date_add_to_use,
+      });
+
+      await fetchFromPrestashopApi(`/carts/${id}?ps_method=PATCH`, {
+        method: "POST",
+        headers: { "Content-Type": "application/xml" },
+        body: updateData,
+      });
+    }
+
+    return id;
   } catch (error) {
     console.error("Error creating cart:", error);
     throw error;
@@ -391,6 +414,8 @@ async function createOrder(
   totalAmountWt: number,
   paymentMethod: string,
   languageData: LanguageData,
+  date_add_to_use?: string,
+  initialStateId: (typeof ORDER_STATES)[keyof typeof ORDER_STATES] = ORDER_STATES.AWAITING_CASH_ON_DELIVERY,
 ): Promise<{ id: number; reference: string }> {
   const converter = new PrestaShopXMLConverter(orderSchema, "");
 
@@ -402,7 +427,7 @@ async function createOrder(
     id_lang: languageData.language_id.toString(),
     id_customer: customerId.toString(),
     id_carrier: "0",
-    current_state: ORDER_STATES.AWAITING_CASH_ON_DELIVERY.toString(),
+    current_state: initialStateId.toString(),
     module: "ps_cashondelivery",
     payment: paymentMethod,
     total_paid: "0",
@@ -413,24 +438,91 @@ async function createOrder(
     valid: "1",
     id_shop: "1",
     id_shop_group: "1",
+    date_add: date_add_to_use,
   };
 
   const xmlData = converter.convertRowToXML(orderData);
-  console.log("Create Order XML:", xmlData);
 
   try {
     const response = await fetchFromPrestashopApi<{
-      order: { id: number; reference: string };
+      order: OrderReadXML;
     }>("/orders", {
       method: "POST",
       headers: { "Content-Type": "application/xml" },
       body: xmlData,
     });
 
-    return {
-      id: response.order.id,
-      reference: response.order.reference,
-    };
+    const orderId = response.order.id;
+
+    // Get the order reference (PrestaShop generates it after order creation)
+    const orderData = (
+      await fetchFromPrestashopApi<{
+        order: OrderReadXML;
+      }>(`/orders/${orderId}?display=full`, {
+        method: "GET",
+      })
+    ).order;
+
+    console.log(
+      "Created order with new data:",
+      orderData,
+      "Reference:",
+      orderData.reference,
+    );
+
+    // Delete original payment and original state for the order as we will create them manually later to set the correct dates
+    const idOrderHistory = await fetchFromPrestashopApi<{
+      order_histories: {
+        order_history: {
+          id: number;
+        };
+      };
+    }>(`/order_histories?filter[id_order]=${orderData.id}&display=[id]`, {
+      method: "GET",
+    });
+
+    await fetchFromPrestashopApi(
+      `/order_histories/${idOrderHistory.order_histories.order_history.id}`,
+      {
+        method: "DELETE",
+      },
+    );
+
+    // Delete payment
+    const idOrderPayment = await fetchFromPrestashopApi<{
+      order_payments: {
+        order_payment: {
+          id: number;
+        };
+      };
+    }>(
+      `/order_payments?filter[order_reference]=${orderData.reference}&display=[id]`,
+      { method: "GET" },
+    );
+
+    await fetchFromPrestashopApi(
+      `/order_payments/${idOrderPayment.order_payments.order_payment.id}`,
+      {
+        method: "DELETE",
+      },
+    );
+
+    // Add initial state back
+    await updateOrderState(orderData.id, initialStateId, date_add_to_use);
+
+    // Update order date_add and date_upd to match the original date (PrestaShop API doesn't allow setting these on creation)
+    const updateOrderData = converter.convertRowToXML({
+      id: orderData.id.toString(),
+      date_add: date_add_to_use,
+    });
+
+    await fetchFromPrestashopApi(`/orders/${orderData.id}?ps_method=PATCH`, {
+      method: "POST",
+      headers: { "Content-Type": "application/xml" },
+      body: updateOrderData,
+    });
+
+    return orderData;
   } catch (error) {
     console.error("Error creating order:", error);
     throw error;
@@ -441,22 +533,51 @@ async function createOrder(
 async function updateOrderState(
   orderId: number,
   orderStateId: number,
-): Promise<void> {
+  date_add?: string,
+  additional_data: Record<string, string> = {},
+): Promise<OrderHistoryXML> {
   const converter = new PrestaShopXMLConverter(orderHistorySchema, "");
 
   const historyData: Record<string, string> = {
     id_order: orderId.toString(),
     id_order_state: orderStateId.toString(),
+    date_add,
+    ...additional_data,
   };
 
   const xmlData = converter.convertRowToXML(historyData);
 
   try {
-    await fetchFromPrestashopApi("/order_histories", {
+    const response = await fetchFromPrestashopApi<{
+      order_history: OrderHistoryXML;
+    }>("/order_histories", {
       method: "POST",
       headers: { "Content-Type": "application/xml" },
       body: xmlData,
     });
+
+    const orderHistory = response.order_history;
+
+    // Update date_add if provided
+    if (date_add) {
+      const updateData = converter.convertRowToXML({
+        id: orderHistory.id.toString(),
+        date_add: date_add,
+      });
+
+      await fetchFromPrestashopApi(
+        `/order_histories/${orderHistory.id}?ps_method=PATCH`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/xml" },
+          body: updateData,
+        },
+      );
+
+      orderHistory.date_add = date_add;
+    }
+
+    return orderHistory;
   } catch (error) {
     console.error(`Error updating order state to ${orderStateId}:`, error);
     throw error;
@@ -465,13 +586,15 @@ async function updateOrderState(
 
 // Add payment to order
 async function addOrderPayment(
+  orderId: number,
   orderReference: string,
   amount: number,
+  date_add?: string,
   paymentMethod: string = "Cash On Delivery",
-): Promise<void> {
+): Promise<OrderPaymentXML> {
   const converter = new PrestaShopXMLConverter(orderPaymentSchema, "");
 
-  const transactionId = `IMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const transactionId = `IMP-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
   const paymentData: Record<string, string> = {
     order_reference: orderReference,
@@ -480,17 +603,76 @@ async function addOrderPayment(
     payment_method: paymentMethod,
     conversion_rate: "1",
     transaction_id: transactionId,
-    date_add: new Date().toISOString().slice(0, 19).replace("T", " "),
   };
 
   const xmlData = converter.convertRowToXML(paymentData);
 
   try {
-    await fetchFromPrestashopApi("/order_payments", {
+    const response = await fetchFromPrestashopApi<{
+      order_payment: OrderPaymentXML;
+    }>("/order_payments", {
       method: "POST",
       headers: { "Content-Type": "application/xml" },
       body: xmlData,
     });
+
+    const orderPayment = response.order_payment;
+
+    // Update date_add if provided
+    if (date_add) {
+      const updateData = converter.convertRowToXML({
+        id: orderPayment.id.toString(),
+        date_add: date_add,
+      });
+
+      await fetchFromPrestashopApi(
+        `/order_payments/${orderPayment.id}?ps_method=PATCH`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/xml" },
+          body: updateData,
+        },
+      );
+
+      orderPayment.date_add = date_add;
+
+      // Also update order_invoice date_add
+      const converterInvoice = new PrestaShopXMLConverter(
+        orderInvoiceSchema,
+        "",
+      );
+
+      // Fetch invoice ID for the order
+      const invoiceResponse = await fetchFromPrestashopApi<{
+        order_invoices: {
+          order_invoice: OrderInvoiceXML;
+        };
+      }>(`/order_invoices?filter[id_order]=${orderId}&display=[id]`, {
+        method: "GET",
+        headers: { "Content-Type": "application/xml" },
+      });
+
+      if (
+        invoiceResponse.order_invoices &&
+        invoiceResponse.order_invoices.order_invoice
+      ) {
+        const updateInvoiceData = converterInvoice.convertRowToXML({
+          id: invoiceResponse.order_invoices.order_invoice.id.toString(),
+          date_add: date_add,
+        });
+
+        await fetchFromPrestashopApi(
+          `/order_invoices/${invoiceResponse.order_invoices.order_invoice.id}?ps_method=PATCH`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/xml" },
+            body: updateInvoiceData,
+          },
+        );
+      }
+    }
+
+    return orderPayment;
   } catch (error) {
     console.error("Error adding payment:", error);
     throw error;
@@ -542,7 +724,10 @@ function getOrderFlow(status: string): {
 } {
   const statusLower = status.toLowerCase().trim();
 
-  if (statusLower === "paiement accepté" || statusLower === "paiement effectué") {
+  if (
+    statusLower === "paiement accepté" ||
+    statusLower === "paiement effectué"
+  ) {
     return {
       stateId: ORDER_STATES.PAYMENT_ACCEPTED,
     };
@@ -571,16 +756,48 @@ async function processCompleteOrderFlow(
   orderId: number,
   orderReference: string,
   totalAmount: number,
+  date_add?: string,
+  deleteGeneratedPayments: boolean = true,
 ): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 300));
-  await updateOrderState(orderId, ORDER_STATES.SHIPPED);
+  await updateOrderState(orderId, ORDER_STATES.SHIPPED, date_add);
 
   await new Promise((resolve) => setTimeout(resolve, 300));
-  await updateOrderState(orderId, ORDER_STATES.DELIVERED);
+  await updateOrderState(orderId, ORDER_STATES.DELIVERED, date_add);
 
   await new Promise((resolve) => setTimeout(resolve, 300));
-  await addOrderPayment(orderReference, totalAmount);
-  await updateOrderState(orderId, ORDER_STATES.PAYMENT_ACCEPTED);
+  const orderPayment = await addOrderPayment(
+    orderId,
+    orderReference,
+    totalAmount,
+    date_add,
+    "Cash On Delivery",
+  );
+
+  // This will create 2 order payments, so we need to delete those two and keep only one with the correct date
+  await updateOrderState(orderId, ORDER_STATES.PAYMENT_ACCEPTED, date_add);
+
+  if (deleteGeneratedPayments) {
+    // Get all payments id for the order and filter idOrderPayment.id !== orderPayment.id
+    const paymentsResponse = await fetchFromPrestashopApi<{
+      order_payments: {
+        order_payment: OrderPaymentXML[] | OrderPaymentXML;
+      };
+    }>(
+      `/order_payments?filter[order_reference]=${orderReference}&display=[id]`,
+      {
+        method: "GET",
+      },
+    );
+
+    const payments = assureArray(paymentsResponse.order_payments.order_payment);
+
+    for (const payment of payments)
+      if (payment.id !== orderPayment.id)
+        await fetchFromPrestashopApi(`/order_payments/${payment.id}`, {
+          method: "DELETE",
+        });
+  }
 }
 
 // Main import function
@@ -790,6 +1007,14 @@ export async function importCustomersFromFile(
                 0,
               );
 
+              const date_add = parse(date, "dd/MM/yyyy", new Date());
+              date_add.setHours(0, 0, 0); // Set to 00:00 for consistency
+
+              const date_add_str = date_add
+                .toISOString()
+                .slice(0, 19)
+                .replace("T", " ");
+
               // Create cart
               const cartId = await createCart(
                 cartItems.map((i) => ({
@@ -799,10 +1024,10 @@ export async function importCustomersFromFile(
                 })),
                 customerId,
                 addressId,
-                parse(date, "dd/MM/yyyy", new Date()),
+                date_add_str,
               );
 
-              if(etat === '') {
+              if (etat === "") {
                 // If no status then we don't create an order but keep it as a cart
                 rows.push({
                   index: index + 1,
@@ -810,7 +1035,9 @@ export async function importCustomersFromFile(
                   success: true,
                   warnings: warnings.length > 0 ? warnings : undefined,
                 });
-                toast.success(`Processed (cart created): ${cartId} for ${email}`);
+                toast.success(
+                  `Processed (cart created): ${cartId} for ${email}`,
+                );
                 continue;
               }
 
@@ -826,6 +1053,7 @@ export async function importCustomersFromFile(
                 totalAmountWt,
                 "Paiement à la livraison",
                 languageData,
+                date_add_str,
               );
 
               console.log(
@@ -835,7 +1063,11 @@ export async function importCustomersFromFile(
               // Handle order flow based on status
               switch (stateId) {
                 case ORDER_STATES.CANCELED:
-                  await updateOrderState(order.id, ORDER_STATES.CANCELED);
+                  await updateOrderState(
+                    order.id,
+                    ORDER_STATES.CANCELED,
+                    date_add_str,
+                  );
                   console.log(`Order #${order.reference} canceled`);
                   break;
 
@@ -844,6 +1076,7 @@ export async function importCustomersFromFile(
                     order.id,
                     order.reference,
                     totalAmountWt,
+                    date_add_str,
                   );
                   console.log(
                     `Order #${order.reference} completed with payment`,
@@ -851,19 +1084,21 @@ export async function importCustomersFromFile(
                   break;
 
                 case ORDER_STATES.PAYMENT_ERROR:
-                  await updateOrderState(order.id, ORDER_STATES.PAYMENT_ERROR);
+                  await updateOrderState(
+                    order.id,
+                    ORDER_STATES.PAYMENT_ERROR,
+                    date_add_str,
+                  );
                   console.log(`Order #${order.reference} set to payment error`);
                   break;
 
                 case ORDER_STATES.AWAITING_CASH_ON_DELIVERY:
                 default:
-                  await updateOrderState(
-                    order.id,
-                    ORDER_STATES.AWAITING_CASH_ON_DELIVERY,
-                  );
+                  // For awaiting payment, we ignore as the order is already created with this state and we don't want to change it
                   console.log(
-                    `Order #${order.reference} set to awaiting payment`,
+                    `Order #${order.reference} created with awaiting payment state`,
                   );
+                  break;
               }
 
               console.log(

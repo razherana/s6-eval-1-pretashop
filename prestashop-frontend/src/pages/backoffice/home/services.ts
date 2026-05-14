@@ -9,8 +9,9 @@ import type {
   TaxReadXML,
   TaxRuleGroupReadXML,
   TaxRuleReadXML,
-  OrderPaymentReadXML,
+  OrderPaymentXML,
   OrderHistoryXML,
+  OrderInvoiceXML,
 } from "./types";
 import { PrestaShopXMLConverter } from "@/utils/xml";
 
@@ -319,7 +320,7 @@ export async function fetchOrders(
 export async function fetchOrderPayments(
   limit: number = 100,
   offset: number = 0,
-): Promise<OrderPaymentReadXML[]> {
+): Promise<OrderPaymentXML[]> {
   const query = new URLSearchParams({
     display: "full",
     limit: limit.toString(),
@@ -391,6 +392,35 @@ export async function fetchOrderHistories(
     return [];
   } catch (error) {
     console.error("Error fetching order histories:", error);
+    throw error;
+  }
+}
+
+export async function fetchOrderInvoices(
+  limit: number = 100,
+  offset: number = 0,
+): Promise<OrderInvoiceXML[]> {
+  const query = new URLSearchParams({
+    display: "full",
+    limit: limit.toString(),
+    offset: offset.toString(),
+  });
+
+  try {
+    const response = await fetchFromPrestashopApi<{
+      order_invoices: {
+        order_invoice: OrderInvoiceXML[];
+      };
+    }>(`/order_invoices?${query.toString()}`, { method: "GET" });
+
+    if (response.order_invoices.order_invoice) {
+      return Array.isArray(response.order_invoices.order_invoice)
+        ? response.order_invoices.order_invoice
+        : [response.order_invoices.order_invoice];
+    }
+    return [];
+  } catch (error) {
+    console.error("Error fetching order invoices:", error);
     throw error;
   }
 }
@@ -576,6 +606,29 @@ export async function resetOrderHistories(orderHistoryIds: number[]): Promise<{
   }
 
   return { deletedOrderHistoryIds, failedOrderHistoryIds };
+}
+
+export async function resetOrderInvoices(orderInvoiceIds: number[]): Promise<{
+  deletedOrderInvoiceIds: number[];
+  failedOrderInvoiceIds: number[];
+}> {
+  const deletedOrderInvoiceIds: number[] = [];
+  const failedOrderInvoiceIds: number[] = [];
+
+  for (const id of orderInvoiceIds) {
+    try {
+      await fetchFromPrestashopApi(`/order_invoices/${id}`, {
+        method: "DELETE",
+      });
+      console.log(`Deleted order invoice with ID: ${id}`);
+      deletedOrderInvoiceIds.push(id);
+    } catch (error) {
+      console.error("Error deleting order invoice:", error);
+      failedOrderInvoiceIds.push(id);
+    }
+  }
+
+  return { deletedOrderInvoiceIds, failedOrderInvoiceIds };
 }
 
 export async function resetCustomers(customerIds: number[]): Promise<{

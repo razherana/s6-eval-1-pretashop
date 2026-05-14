@@ -3,6 +3,10 @@ import type { DataXmlApiSchema, XmlApiSchema } from "@/utils/xml";
 const dataSchema: DataXmlApiSchema = {
   rootTag: "order",
   fields: {
+    id: {
+      xmlTag: "id",
+      type: "simple",
+    },
     id_address_delivery: {
       xmlTag: "id_address_delivery",
       type: "simple",
@@ -120,6 +124,16 @@ const dataSchema: DataXmlApiSchema = {
     },
     valid: {
       xmlTag: "valid",
+      type: "simple",
+      attributes: {},
+    },
+    date_add: {
+      xmlTag: "date_add",
+      type: "simple",
+      attributes: {},
+    },
+    date_upd: {
+      xmlTag: "date_upd",
       type: "simple",
       attributes: {},
     },
