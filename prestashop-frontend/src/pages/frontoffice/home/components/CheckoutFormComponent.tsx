@@ -50,8 +50,25 @@ export function CheckoutFormComponent() {
   // Cart selection state
   const [checkoutMode, setCheckoutMode] = useState<'current' | 'saved'>('current');
   const [loadingCartItems, setLoadingCartItems] = useState(false);
+  const [selectedCartId, setSelectedCartId] = useState<number | null>(null);
 
   const handleSelectCart = useCallback(async (cart: UserCart) => {
+    setSelectedCartId(cart.id);
+    clearCart();
+
+    // Load cart items and add to current cart
+    const cartItems = await cartToCartItems(cart);
+    for (const item of cartItems) {
+      if (item.productId) {
+        addToCart(item, item.quantity);
+      }
+    }
+
+    setCheckoutMode('current');
+    toast.success(`Selected cart #${cart.id} for checkout`);
+  }, [addToCart, clearCart]);
+
+  const handleAddToCurrentCart = useCallback(async (cart: UserCart) => {
     setLoadingCartItems(true);
     
     try {
@@ -61,8 +78,7 @@ export function CheckoutFormComponent() {
           addToCart(item, item.quantity);
         }
       }
-      setCheckoutMode('current');
-      toast.success(`Added ${cartItems.length} items from saved cart #${cart.id}`);
+      toast.success(`Added ${cartItems.length} items from cart #${cart.id} to current cart`);
     } catch (error) {
       console.error('Error loading cart items:', error);
       toast.error('Failed to load cart items');
@@ -74,7 +90,8 @@ export function CheckoutFormComponent() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (items.length === 0) {
+    // Check for items based on checkout mode
+    if (selectedCartId === null && items.length === 0) {
       toast.error('No items to checkout');
       return;
     }
@@ -105,11 +122,12 @@ export function CheckoutFormComponent() {
       };
 
       const result = await processCheckout(
-        items,
+        selectedCartId !== null ? [] : items, // Pass empty array if using saved cart
         customerInfo,
         language?.language_id || 1,
         language?.currency_id || 1,
         activeTab === 'account' ? authData.user?.id : undefined,
+        selectedCartId || undefined, // Pass the selected cart ID if available
       );
 
       setOrderSuccess({
@@ -119,6 +137,7 @@ export function CheckoutFormComponent() {
       });
 
       clearCart();
+      setSelectedCartId(null);
       toast.success('Order placed successfully!');
     } catch (error) {
       console.error('Checkout error:', error);
@@ -217,6 +236,7 @@ export function CheckoutFormComponent() {
                 )}
                 <SavedCartsComponent
                   onSelectCart={handleSelectCart}
+                  onAddToCurrentCart={handleAddToCurrentCart}
                 />
               </div>
             )}
@@ -326,7 +346,7 @@ export function CheckoutFormComponent() {
         <h3 className="font-semibold">Order Summary</h3>
         <div className="space-y-1 text-sm">
           <div className="flex justify-between">
-            <span>Items ({items.length})</span>
+            <span>Items ({selectedCartId !== null ? '?' : items.length})</span>
             <span>{totalPrice.toFixed(2)} €</span>
           </div>
           <div className="flex justify-between text-green-600">
@@ -341,6 +361,9 @@ export function CheckoutFormComponent() {
         <div className="text-xs text-muted-foreground space-y-1">
           <p>Payment method: <strong>Payment on delivery</strong></p>
           <p>Free shipping on all orders</p>
+          {selectedCartId !== null && (
+            <p className="text-primary">✓ Using saved cart #{selectedCartId}</p>
+          )}
           {activeTab === 'account' && authData.user && (
             <p className="text-primary">✓ Ordering as: {authData.user.email}</p>
           )}

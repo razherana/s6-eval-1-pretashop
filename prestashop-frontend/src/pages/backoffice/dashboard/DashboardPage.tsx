@@ -181,7 +181,7 @@ export function DashboardPage() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         {/* Date Filter */}
-        <div className="mb-8">
+        {/* <div className="mb-8">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Label htmlFor="date-filter" className="text-sm font-medium">
@@ -217,7 +217,7 @@ export function DashboardPage() {
               {format(selectedDate, "dd MMMM yyyy", { locale: fr })}
             </p>
           )}
-        </div>
+        </div> */}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

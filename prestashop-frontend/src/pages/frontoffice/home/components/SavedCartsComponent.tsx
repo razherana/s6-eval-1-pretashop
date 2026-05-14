@@ -28,6 +28,7 @@ import { fetchProductCombinations } from '../services';
 
 interface SavedCartsProps {
   onSelectCart: (cart: UserCart) => void;
+  onAddToCurrentCart?: (cart: UserCart) => void;
 }
 
 interface CartProductInfo {
@@ -42,6 +43,7 @@ interface CartProductInfo {
 
 export function SavedCartsComponent({
   onSelectCart,
+  onAddToCurrentCart,
 }: SavedCartsProps) {
   const { authData } = useFrontofficeAuth();
   const { data } = useFrontofficeData();
@@ -271,16 +273,16 @@ export function SavedCartsComponent({
                                   const images = product.product?.associations?.images?.image;
                                   const normalizedImages = Array.isArray(images) ? images : images ? [images] : [];
                                   return normalizedImages?.[0] ? (
-                                  <img
-                                    src={`${normalizedImages[0]['@_xlink:href']}?${API_QUERY}`}
-                                    alt=""
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="flex h-full items-center justify-center">
-                                    <Package className="h-6 w-6 text-gray-400" />
-                                  </div>
-                                );
+                                    <img
+                                      src={`${normalizedImages[0]['@_xlink:href']}?${API_QUERY}`}
+                                      alt=""
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex h-full items-center justify-center">
+                                      <Package className="h-6 w-6 text-gray-400" />
+                                    </div>
+                                  );
                                 })()}
                               </div>
                               <div className="flex-1 min-w-0">
@@ -320,9 +322,23 @@ export function SavedCartsComponent({
                       <p className="text-sm text-muted-foreground text-center py-4">No products in this cart</p>
                     )}
 
-                    {/* Single action button */}
-                    <div className="mt-4">
+                    {/* Action buttons */}
+                    <div className="mt-4 space-y-2 grid sm:grid-cols-2 gap-2">
                       <Button
+                        type='button'
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAddToCurrentCart?.(cart);
+                        }}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add to Current Cart
+                      </Button>
+                      <Button
+                        type='button'
                         size="sm"
                         className="w-full"
                         onClick={(e) => {
@@ -330,8 +346,7 @@ export function SavedCartsComponent({
                           onSelectCart(cart);
                         }}
                       >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Add to Current Cart
+                        Select this Cart
                       </Button>
                     </div>
                   </div>

@@ -470,6 +470,7 @@ export async function processCheckout(
   languageId: number = 1,
   currencyId: number = 1,
   existingCustomerId?: number,
+  savedCartId?: number,
 ): Promise<OrderResult> {
   try {
     let customer: GuestCustomer;
@@ -503,14 +504,23 @@ export async function processCheckout(
       COUNTRY_ID,
     );
 
-    toast.info("Creating your cart...");
-    const cartId = await createCart(
-      cartItems,
-      currencyId,
-      languageId,
-      customer.id,
-      addressId,
-    );
+    let cartId: number;
+
+    if (savedCartId) {
+      // Use existing saved cart
+      toast.info("Using your saved cart...");
+      cartId = savedCartId;
+    } else {
+      // Create a new cart with items
+      toast.info("Creating your cart...");
+      cartId = await createCart(
+        cartItems,
+        currencyId,
+        languageId,
+        customer.id,
+        addressId,
+      );
+    }
 
     const cartTotal = await getCartTotal(cartId);
     console.log("Cart Total:", cartTotal);
