@@ -34,13 +34,9 @@ export interface ProductReadXML {
           };
     };
     combinations: {
-      combination:
-        | [
-            {
-              id: number;
-            },
-          ]
-        | [];
+      combination: {
+        id: number;
+      }[];
     };
   };
   price: number;

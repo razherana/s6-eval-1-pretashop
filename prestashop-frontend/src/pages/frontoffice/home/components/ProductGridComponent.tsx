@@ -3,6 +3,9 @@ import { useEffect, useRef, useCallback } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProductCardComponent } from './ProductCardComponent';
 import { useFrontofficeData } from '@/hooks/useFrontofficeData';
+import { Badge } from '@/components/ui/badge';
+import { X } from 'lucide-react';
+import { getWithLanguage, useLanguage } from '@/utils/lang';
 
 interface ProductGridProps {
   languageId: number;
@@ -10,6 +13,60 @@ interface ProductGridProps {
   conversionRate: number;
   locale: string;
 }
+
+const ActiveFilters = () => {
+  const { filters, applyFilters } = useFrontofficeData();
+  const { language } = useLanguage();
+  const { data } = useFrontofficeData();
+
+  const hasActiveFilters = filters.name || filters.categoryId ||
+    filters.priceMin !== undefined || filters.priceMax !== undefined;
+
+  if (!hasActiveFilters) return null;
+
+  const getCategoryName = (id: number) => {
+    const category = data?.categories.find(c => c.id === id);
+    return category ? getWithLanguage(category.name, language.language_id) : `#${id}`;
+  };
+
+  return (
+    <div className="flex flex-wrap gap-2 mb-4">
+      {filters.name && (
+        <Badge variant="secondary" className="flex items-center gap-1">
+          Name: "{filters.name}"
+          <X
+            className="h-3 w-3 cursor-pointer"
+            onClick={() => applyFilters({ ...filters, name: undefined })}
+          />
+        </Badge>
+      )}
+      {filters.categoryId && (
+        <Badge variant="secondary" className="flex items-center gap-1">
+          Category: {getCategoryName(filters.categoryId)}
+          <X
+            className="h-3 w-3 cursor-pointer"
+            onClick={() => applyFilters({ ...filters, categoryId: undefined })}
+          />
+        </Badge>
+      )}
+      {(filters.priceMin !== undefined || filters.priceMax !== undefined) && (
+        <Badge variant="secondary" className="flex items-center gap-1">
+          Price: {filters.priceMin || '0'}€ - {filters.priceMax || '∞'}€
+          <X
+            className="h-3 w-3 cursor-pointer"
+            onClick={() =>
+              applyFilters({
+                ...filters,
+                priceMin: undefined,
+                priceMax: undefined,
+              })
+            }
+          />
+        </Badge>
+      )}
+    </div>
+  );
+};
 
 export function ProductGridComponent({
   languageId,
@@ -78,6 +135,7 @@ export function ProductGridComponent({
 
   return (
     <div>
+      <ActiveFilters />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {data?.products.map((product) => (
           <ProductCardComponent

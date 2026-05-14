@@ -17,6 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useFrontofficeData } from '@/hooks/useFrontofficeData';
@@ -26,6 +27,7 @@ import {
   Filter,
   Search,
   RotateCcw,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { SearchFilters } from '../types/search';
@@ -36,6 +38,7 @@ export function SearchFilterComponent() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState<SearchFilters>(filters);
+  const [_searchInCombinations, setSearchInCombinations] = useState(false);
 
   const handleApply = () => {
     applyFilters(localFilters);
@@ -47,12 +50,15 @@ export function SearchFilterComponent() {
 
     if (activeFilters > 0) {
       toast.success(`${activeFilters} filter(s) applied`);
+    } else {
+      toast.success('Filters cleared');
     }
   };
 
   const handleReset = () => {
     const emptyFilters: SearchFilters = {};
     setLocalFilters(emptyFilters);
+    setSearchInCombinations(false);
     applyFilters(emptyFilters);
     setIsOpen(false);
     toast.success('Filters reset');
@@ -81,9 +87,12 @@ export function SearchFilterComponent() {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Search className="h-5 w-5" />
+            <SlidersHorizontal className="h-5 w-5" />
             Search & Filter Products
           </DialogTitle>
+          <DialogDescription>
+            Filter products by name, category, price range. Prices include combinations (variants).
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
@@ -94,7 +103,7 @@ export function SearchFilterComponent() {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="search-name"
-                placeholder="Search by name..."
+                placeholder="Search by product name..."
                 className="pl-10"
                 value={localFilters.name || ''}
                 onChange={(e) =>
@@ -105,6 +114,9 @@ export function SearchFilterComponent() {
                 }
               />
             </div>
+            <p className="text-xs text-muted-foreground">
+              Searches in product names
+            </p>
           </div>
 
           {/* Category Filter */}
@@ -125,7 +137,7 @@ export function SearchFilterComponent() {
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
                 {data?.categories
-                  .filter((c) => c.id !== 1 && c.id !== 2) // Exclude root and home
+                  .filter((c) => c.id !== 1 && c.id !== 2)
                   .map((category) => (
                     <SelectItem
                       key={category.id}
@@ -142,13 +154,20 @@ export function SearchFilterComponent() {
 
           {/* Price Range */}
           <div className="space-y-3">
-            <Label>Price Range (€)</Label>
+            <div className="flex items-center justify-between">
+              <Label>Price Range</Label>
+              <span className="text-xs text-muted-foreground">
+                Includes variant prices
+              </span>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Min</Label>
+                <Label className="text-xs text-muted-foreground">Min (€)</Label>
                 <Input
                   type="number"
                   placeholder="0"
+                  min="0"
+                  step="0.01"
                   value={localFilters.priceMin || ''}
                   onChange={(e) =>
                     setLocalFilters((prev) => ({
@@ -159,10 +178,12 @@ export function SearchFilterComponent() {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Max</Label>
+                <Label className="text-xs text-muted-foreground">Max (€)</Label>
                 <Input
                   type="number"
-                  placeholder="Any"
+                  placeholder="No limit"
+                  min="0"
+                  step="0.01"
                   value={localFilters.priceMax || ''}
                   onChange={(e) =>
                     setLocalFilters((prev) => ({
@@ -173,24 +194,25 @@ export function SearchFilterComponent() {
                 />
               </div>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Filters products where base price OR any variant price is in range
+            </p>
           </div>
         </div>
 
-        <DialogFooter>
-          <div className="flex gap-2 w-full">
-            <Button
-              variant="outline"
-              onClick={handleReset}
-              className="gap-2"
-            >
-              <RotateCcw className="h-4 w-4" />
-              Reset
-            </Button>
-            <Button onClick={handleApply} className="gap-2 flex-1">
-              <Search className="h-4 w-4" />
-              Apply Filters
-            </Button>
-          </div>
+        <DialogFooter className="flex gap-2 sm:gap-0">
+          <Button
+            variant="outline"
+            onClick={handleReset}
+            className="gap-2"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Reset
+          </Button>
+          <Button onClick={handleApply} className="gap-2 flex-1">
+            <Search className="h-4 w-4" />
+            Apply Filters
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

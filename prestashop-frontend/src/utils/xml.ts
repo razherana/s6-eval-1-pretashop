@@ -405,3 +405,14 @@ export class PrestaShopXMLConverter {
     return doc.end({ prettyPrint: true });
   }
 }
+
+/**
+ * Utility function to ensure a value is always returned as an array.
+ * 
+ * @param item 
+ * @returns 
+ */
+export function assureArray<T>(item: T | T[]): T[] {
+  if (item === null || item === undefined) return [];
+  return Array.isArray(item) ? item : [item];
+}
