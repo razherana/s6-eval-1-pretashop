@@ -1,3 +1,5 @@
+// src/pages/backoffice/home/types.ts
+
 export const ORDER_STATES = {
   AWAITING_CASH_ON_DELIVERY: 13, // Awaiting Cash On Delivery validation
   SHIPPED: 4, // Shipped
@@ -47,6 +49,7 @@ export interface ProductReadXML {
       }
     | "";
   price_ttc?: number;
+  available_date: string;
 }
 
 export interface CombinationDetailXML {

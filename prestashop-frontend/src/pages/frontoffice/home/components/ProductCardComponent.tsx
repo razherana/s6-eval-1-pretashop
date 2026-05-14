@@ -1,9 +1,9 @@
 // src/pages/frontoffice/home/components/ProductCardComponent.tsx
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingCart, ChevronLeft, ChevronRight, Heart } from 'lucide-react';
+import { ShoppingCart, ChevronLeft, ChevronRight, Heart, Flame, Sparkles } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { getWithLanguage, getFormattedPrice } from '@/utils/lang';
 import { ProductCombinationSelectComponent } from './ProductCombinationSelectComponent';
@@ -27,6 +27,38 @@ interface ProductCardProps {
   currency: string;
   conversionRate: number;
   locale: string;
+}
+
+// Helper to determine if a product is HOT or NEW based on available_date
+function getProductBadge(availableDate: string): { type: 'hot' | 'new' | null; label: string } {
+  if (!availableDate) return { type: null, label: '' };
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0); // Start of today
+  
+  const today = new Date(now);
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  const oneWeekAgo = new Date(now);
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+  const productDate = new Date(availableDate);
+  productDate.setHours(0, 0, 0, 0);
+
+  // HOT: available_date is yesterday or today (today - 1 <= available_date < today + 1)
+  // Meaning: product was released yesterday or today
+  if (productDate >= yesterday && productDate <= today) {
+    return { type: 'hot', label: 'HOT' };
+  }
+
+  // NEW: available_date is within last 7 days (today - 7 <= available_date < today)
+  // Meaning: product was released in the last week (but not today/yesterday)
+  if (productDate >= oneWeekAgo && productDate < yesterday) {
+    return { type: 'new', label: 'NEW' };
+  }
+
+  return { type: null, label: '' };
 }
 
 export function ProductCardComponent({
@@ -56,6 +88,12 @@ export function ProductCardComponent({
   const combinationData = product.associations?.combinations?.combination;
   const combinationArray = Array.isArray(combinationData) ? combinationData : combinationData ? [combinationData] : [];
   const hasCombinations = combinationArray.length > 0;
+
+  // Calculate HOT/NEW badge
+  const productBadge = useMemo(
+    () => getProductBadge(product.available_date),
+    [product.available_date]
+  );
 
   const formattedPrice = getFormattedPrice(
     currentPrice,
@@ -141,6 +179,26 @@ export function ProductCardComponent({
           ) : (
             <div className="flex h-full items-center justify-center text-gray-400">
               No Image Available
+            </div>
+          )}
+
+          {/* HOT/NEW Badge */}
+          {productBadge.type && (
+            <div className="absolute left-2 top-2 z-10">
+              <Badge
+                className={`flex items-center gap-1 px-2 py-1 text-xs font-bold ${
+                  productBadge.type === 'hot'
+                    ? 'bg-red-500 text-white hover:bg-red-600'
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                }`}
+              >
+                {productBadge.type === 'hot' ? (
+                  <Flame className="h-3 w-3" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                {productBadge.label}
+              </Badge>
             </div>
           )}
 
