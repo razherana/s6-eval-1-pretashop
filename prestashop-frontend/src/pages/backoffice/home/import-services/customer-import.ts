@@ -809,6 +809,7 @@ export async function importCustomersFromFile(
   _decimalSeparator: string,
   _languageIds: number[] = [1, 2, 3],
   languageData: LanguageData,
+  dateFormat: string,
 ): Promise<ImportResult> {
   const parsedRows = await parseCsvFile(file, delimiter);
 
@@ -1009,7 +1010,7 @@ export async function importCustomersFromFile(
                 0,
               );
 
-              const date_add = parse(date, "dd/MM/yyyy", new Date(), {
+              const date_add = parse(date, dateFormat, new Date(), {
                 in: utc,
               });
               date_add.setHours(0, 0, 0); // Set to 00:00 for consistency

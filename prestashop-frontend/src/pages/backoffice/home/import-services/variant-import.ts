@@ -514,7 +514,12 @@ async function getOrCreateStockAvailable(
 }
 
 export async function importVariantsFromFile(
-file: File, delimiter: string, decimalSeparator: string, languageIds: number[], availableDateReferenceMap: Record<string, string>,
+  file: File,
+  delimiter: string,
+  decimalSeparator: string,
+  languageIds: number[],
+  availableDateReferenceMap: Record<string, string>,
+  dateFormat: string
 ): Promise<ImportResult> {
   const parsedRows = await parseCsvFile(file, delimiter);
 
@@ -556,7 +561,7 @@ file: File, delimiter: string, decimalSeparator: string, languageIds: number[], 
     for (const taxRule of allTaxRules) {
       const taxData = taxRule.id_tax ? allTaxes.get(taxRule.id_tax) : null;
       const taxRate = taxData ? taxData.rate : 0;
-      
+
       taxRuleGroupMap.set(taxRule.id_tax_rules_group["#text"], {
         taxRate,
       });
@@ -614,7 +619,9 @@ file: File, delimiter: string, decimalSeparator: string, languageIds: number[], 
       let availableDate: string | undefined;
       if (row.available_date) {
         try {
-          availableDate = parse(row.available_date, "dd/MM/yyyy", new Date(), { in: utc })
+          availableDate = parse(row.available_date, dateFormat, new Date(), {
+            in: utc,
+          })
             .toISOString()
             .split("T")[0];
         } catch (error) {

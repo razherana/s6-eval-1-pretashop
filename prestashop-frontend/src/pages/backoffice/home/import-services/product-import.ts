@@ -265,6 +265,7 @@ export async function importProductsFromFile(
   delimiter: string,
   decimalSeparator: string,
   languageIds: number[],
+  dateFormat: string
 ): Promise<ImportResult & { availableDateReferenceMap : Record<string, string> }> {
   const parsedRows = await parseCsvFile(file, delimiter);
   const converter = new PrestaShopXMLConverter(productSchema, "");
@@ -364,7 +365,7 @@ export async function importProductsFromFile(
           (numeral(row.prix_ttc || "0").value() || 0) /
           (1 + (taxMap[cleanTax]?.taxId ? parseFloat(cleanTax) / 100 : 0))
         ).toFixed(6),
-        available_date: parse(row.date_availability_produit, "dd/MM/yyyy", new Date(), { in: utc })
+        available_date: parse(row.date_availability_produit, dateFormat, new Date(), { in: utc })
           .toISOString()
           .split("T")[0],
         reference: row.reference || "",

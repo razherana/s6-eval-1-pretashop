@@ -14,6 +14,7 @@ import { ImportResultsView } from "./import-data/ImportResultsView";
 import { type ImportStep, type FileStates, type TotalStats } from "../services";
 import { useLanguage } from "@/utils/lang";
 import { toast } from "sonner";
+import { verifyDataForImport } from "../import-services/verify-import";
 
 export function ImportProductsModalComponent({ open, setOpen }: { open: boolean, setOpen: React.Dispatch<React.SetStateAction<boolean>> }) {
   // File states
@@ -32,6 +33,9 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
   // , or . for decimal separator
   const [decimalSeparator, setDecimalSeparator] = useState(",");
 
+  // Date format
+  const [dateFormat, setDateFormat] = useState("dd/MM/yyyy");
+
   // Import workflow states
   const [currentStep, setCurrentStep] = useState(-1);
   const [isImporting, setIsImporting] = useState(false);
@@ -40,6 +44,7 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
   const [importComplete, setImportComplete] = useState(false);
   const [showResultsTable, setShowResultsTable] = useState(false);
   const [activeResultTab, setActiveResultTab] = useState("products");
+  const [bigError, setBigError] = useState<string>();
 
   // Statistics
   const [totalStats, setTotalStats] = useState<TotalStats>({
@@ -151,6 +156,14 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
     const languageIds = language.rawLanguages?.map(l => l.id) || [1, 2, 3];
 
     try {
+      // Step 0: Verify data
+      await verifyDataForImport(
+        fileStates,
+        delimiter,
+        decimalSeparator,
+        dateFormat
+      );
+
       // Step 1: Products
       setCurrentStep(0);
       setCurrentFileProgress(0);
@@ -159,7 +172,8 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
         fileStates.products!,
         delimiter,
         decimalSeparator,
-        languageIds
+        languageIds,
+        dateFormat
       );
 
       let progressInterval = setInterval(() => {
@@ -182,7 +196,8 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
         delimiter,
         decimalSeparator,
         languageIds,
-        productsImport.availableDateReferenceMap
+        productsImport.availableDateReferenceMap,
+        dateFormat
       );
 
       progressInterval = setInterval(() => {
@@ -205,7 +220,8 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
         delimiter,
         decimalSeparator,
         languageIds,
-        language
+        language,
+        dateFormat
       );
 
       progressInterval = setInterval(() => {
@@ -271,6 +287,7 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
     } catch (error) {
       console.error("Import error:", error);
       toast.error("Import failed: " + (error instanceof Error ? error.message : "Unknown error"));
+      setBigError(error instanceof Error ? error.message : "An unknown error occurred during import.");
     } finally {
       setIsImporting(false);
     }
@@ -320,6 +337,9 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
             setDelimiter={setDelimiter}
             decimalSeparator={decimalSeparator}
             setDecimalSeparator={setDecimalSeparator}
+            dateFormat={dateFormat}
+            setDateFormat={setDateFormat}
+            bigError={bigError}
             currentStep={currentStep}
             isImporting={isImporting}
             currentFileProgress={currentFileProgress}

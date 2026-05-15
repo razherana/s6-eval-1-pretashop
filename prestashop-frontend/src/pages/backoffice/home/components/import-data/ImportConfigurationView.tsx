@@ -3,10 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import React from "react";
-import { CheckCircle, Upload, Eye, Loader2 } from "lucide-react";
+import { CheckCircle, Upload, Eye, Loader2, AlertCircle } from "lucide-react";
 import { FileUploadStep } from "./FileUploadStep";
 import { ImportStatsSummary } from "./ImportStatsSummary";
 import { type ImportStep, type FileStates, type TotalStats, type InputRefs } from "../../services";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ImportConfigurationViewProps {
   importSteps: ImportStep[];
@@ -15,6 +16,9 @@ interface ImportConfigurationViewProps {
   setDelimiter: (delimiter: string) => void;
   decimalSeparator: string;
   setDecimalSeparator: (separator: string) => void;
+  dateFormat: string;
+  setDateFormat: (format: string) => void;
+  bigError: string;
   currentStep: number;
   isImporting: boolean;
   currentFileProgress: number;
@@ -39,6 +43,9 @@ export function ImportConfigurationView({
   setDelimiter,
   decimalSeparator,
   setDecimalSeparator,
+  dateFormat,
+  setDateFormat,
+  bigError,
   currentStep,
   isImporting,
   currentFileProgress,
@@ -71,6 +78,14 @@ export function ImportConfigurationView({
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+        {bigError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error during import</AlertTitle>
+            <AlertDescription>{bigError}</AlertDescription>
+          </Alert>
+        )}
+
         {/* Delimiter Configuration */}
         <div className="space-y-2">
           <Label htmlFor="delimiter">CSV Delimiter</Label>
@@ -102,6 +117,22 @@ export function ImportConfigurationView({
           />
           <p className="text-xs text-muted-foreground">
             Common: comma (,) or period (.)
+          </p>
+        </div>
+
+        {/* Date Format Configuration */}
+        <div className="space-y-2">
+          <Label htmlFor="dateFormat">Date Format</Label>
+          <Input
+            id="dateFormat"
+            value={dateFormat}
+            onChange={(e) => setDateFormat(e.target.value)}
+            placeholder="Enter date format (default: dd/MM/yyyy)"
+            disabled={isImporting}
+            className="max-w-xs"
+          />
+          <p className="text-xs text-muted-foreground">
+            Common: dd/MM/yyyy, MM/dd/yyyy, yyyy-MM-dd
           </p>
         </div>
 
