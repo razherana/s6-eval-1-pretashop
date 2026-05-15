@@ -232,7 +232,7 @@ async function ensureTaxesExist(
   numeral.locale("product-import-locale");
 
   for (const percentage of taxPercentages) {
-    const cleanPercentage = numeral(percentage.replace("%", "").trim()).value();
+    const cleanPercentage = numeral(percentage.replace("%", "").trim()).value() || 0;
     const cleanPercentageStr = cleanPercentage?.toFixed(TAX_PRECISION) || "0";
 
     if (!taxMap[cleanPercentageStr]) {

@@ -717,11 +717,18 @@ export async function resetCarts(): Promise<{
   try {
     const response = await fetchFromPrestashopApi<{
       carts: {
-        cart: { "@_id": number }[];
+        cart?: { "@_id": number }[];
       };
     }>(`/carts?limit=1000`, { method: "GET" });
 
     console.log("Fetched carts for deletion:", response.carts.cart);
+
+    if (!response.carts.cart) {
+      return {
+        deletedCartIds,
+        failedCartIds,
+      };
+    }
 
     const carts = response.carts.cart;
     console.log(`Fetched ${carts.length} carts for deletion.`);
@@ -743,4 +750,46 @@ export async function resetCarts(): Promise<{
   }
 
   return { deletedCartIds, failedCartIds };
+}
+
+export async function resetApi(
+  apiName: string,
+  apiNamePlural: string,
+  specialApiName: string = apiName,
+  specialApiNamePlural: string = apiNamePlural
+): Promise<{
+  deletedApiIds: number[];
+  failedApiIds: number[];
+}> {
+  const failedApiIds: number[] = [];
+  const deletedApiIds: number[] = [];
+  const response = await fetchFromPrestashopApi<{
+    [key: string]:
+      | {
+          [key: string]: { "@_id": number }[];
+        }
+      | undefined;
+  }>(`/${apiNamePlural}?limit=1000`, { method: "GET" });
+
+  if (!response[specialApiNamePlural])
+    return {
+      deletedApiIds,
+      failedApiIds,
+    };
+
+  for (const id of response[specialApiNamePlural][specialApiName]) {
+    try {
+      await fetchFromPrestashopApi(`/${apiNamePlural}/${id["@_id"]}`, {
+        method: "DELETE",
+      });
+      deletedApiIds.push(id["@_id"]);
+    } catch (error) {
+      failedApiIds.push(id["@_id"]);
+    }
+  }
+
+  return {
+    deletedApiIds,
+    failedApiIds,
+  };
 }

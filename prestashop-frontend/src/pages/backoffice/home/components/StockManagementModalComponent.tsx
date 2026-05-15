@@ -44,6 +44,8 @@ import { getWithLanguage } from "@/utils/lang";
 import { toast } from "sonner";
 import type { ProductReadXML } from "../types";
 import { assureArray } from "@/utils/xml";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Switch } from "@/components/ui/switch";
 
 interface StockManagementModalProps {
   open: boolean;
@@ -72,6 +74,9 @@ export function StockManagementModalComponent({
   const [editStockId, setEditStockId] = useState<number | null>(null);
   const [editQuantity, setEditQuantity] = useState<string>("");
   const [saving, setSaving] = useState(false);
+
+  // Is movement mode (set directly the quantity or make a movement)
+  const [isMovement, setIsMovement] = useState(false);
 
   const loadStock = useCallback(async () => {
     if (!product) return;
@@ -161,8 +166,8 @@ export function StockManagementModalComponent({
     if (!product || editStockId === null || !editQuantity) return;
 
     const quantity = parseInt(editQuantity);
-    if (isNaN(quantity) || quantity < 0) {
-      toast.error("Please enter a valid quantity");
+    if (isNaN(quantity) || (quantity < 0 && !isMovement)) {
+      toast.error("Please enter a valid quantity. You are not in movement mode");
       return;
     }
 
@@ -170,7 +175,10 @@ export function StockManagementModalComponent({
     try {
       await updateStockQuantity(
         editStockId,
+        currentStock ? currentStock.quantity : 0,
         quantity,
+        language,
+        isMovement
       );
       setEditStockId(null);
       setEditQuantity("");
@@ -300,47 +308,63 @@ export function StockManagementModalComponent({
               <div className="space-y-3 border rounded-lg p-4">
                 <Label className="flex items-center gap-2">
                   <Save className="h-4 w-4" />
-                  Update Stock
+                  Update Stock Or Make a Stock Movement
                 </Label>
                 {editStockId !== null ? (
-                  <div className="flex gap-2">
-                    <Input
-                      type="number"
-                      min="0"
-                      value={editQuantity}
-                      onChange={(e) => setEditQuantity(e.target.value)}
-                      placeholder="New quantity"
-                      className="flex-1"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleSaveStock();
-                        if (e.key === "Escape") {
+                  <div className="space-y-2">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center space-x-2">
+                          <Label htmlFor="update-movement">Movement Mode</Label>
+                          <Switch id="update-movement" onCheckedChange={(isChecked) => {
+                            setIsMovement(isChecked);
+                          }} />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent align="start">
+                        <p>If <b>disabled</b>, this will update the current quantity but if <b>enabled</b> it will remove or add the quantity to the current stock.</p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        min="0"
+                        value={editQuantity}
+                        onChange={(e) => setEditQuantity(e.target.value)}
+                        placeholder="New quantity"
+                        className="flex-1"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSaveStock();
+                          if (e.key === "Escape") {
+                            setEditStockId(null);
+                            setEditQuantity("");
+                          }
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleSaveStock}
+                        disabled={saving}
+                      >
+                        {saving ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
                           setEditStockId(null);
                           setEditQuantity("");
-                        }
-                      }}
-                    />
-                    <Button
-                      size="sm"
-                      onClick={handleSaveStock}
-                      disabled={saving}
-                    >
-                      {saving ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <CheckCircle2 className="h-4 w-4" />
-                      )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setEditStockId(null);
-                        setEditQuantity("");
-                      }}
-                    >
-                      Cancel
-                    </Button>
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <Button
@@ -353,7 +377,7 @@ export function StockManagementModalComponent({
                       )
                     }
                   >
-                    Edit Quantity
+                    Edit Quantity or Make a Movement
                   </Button>
                 )}
               </div>

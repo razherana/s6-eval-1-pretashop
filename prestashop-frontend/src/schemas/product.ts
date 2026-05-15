@@ -182,6 +182,10 @@ const dataSchema: DataXmlApiSchema = {
       type: "simple",
       attributes: {},
     },
+    is_virtual: {
+      xmlTag: "is_virtual",
+      type: "simple",
+    },
   },
   multiLangFields: {
     name: {

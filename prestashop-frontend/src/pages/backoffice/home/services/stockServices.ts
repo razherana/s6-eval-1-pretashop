@@ -1,4 +1,5 @@
 // src/pages/backoffice/home/services/stockServices.ts
+import type { LanguageData } from "@/contexts/LanguageContext";
 import { stockAvailableSchema } from "@/schemas/stock-available";
 import { fetchFromPrestashopApi } from "@/utils/url";
 import { PrestaShopXMLConverter } from "@/utils/xml";
@@ -34,11 +35,11 @@ export async function fetchProductStock(
   try {
     const response = await fetchFromPrestashopApi<{
       stock_availables: {
-        stock_available?: StockAvailable | StockAvailable[];
+        stock_available: StockAvailable | StockAvailable[];
       };
     }>(`/stock_availables?${query.toString()}`, { method: "GET" });
 
-    const stocks = assureArray(response.stock_availables?.stock_available);
+    const stocks = assureArray(response.stock_availables.stock_available);
 
     const stocksMap = new Map<number, StockAvailable>();
     let defaultStock: StockAvailable | null = null;
@@ -71,28 +72,41 @@ export async function fetchProductStock(
 // Update stock quantity
 export async function updateStockQuantity(
   stockId: number,
-  quantity: number,
+  oldQuantity: number,
+  newQuantity: number,
+  _language: LanguageData,
+  isMovement: boolean,
+  _name: string = "Manual adjustment",
 ): Promise<void> {
   const converter = new PrestaShopXMLConverter(stockAvailableSchema, "");
+
+  let resultQuantity: number;
+
+  if (!isMovement) resultQuantity = newQuantity;
+  else resultQuantity = newQuantity + oldQuantity;
 
   const stockData: Record<string, string> = {
     id: stockId.toString(),
     id_shop: "1",
-    quantity: quantity.toString(),
+    quantity: resultQuantity.toString(),
   };
 
   const xmlData = converter.convertRowToXML(stockData);
 
   try {
-    await fetchFromPrestashopApi(`/stock_availables/${stockId}?ps_method=PATCH`, {
-      method: "POST",
-      headers: { "Content-Type": "application/xml" },
-      body: xmlData,
-    });
-    toast.success(`Stock updated to ${quantity}`);
+    await fetchFromPrestashopApi(
+      `/stock_availables/${stockId}?ps_method=PATCH`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/xml" },
+        body: xmlData,
+      },
+    );
   } catch (error) {
     console.error("Error updating stock:", error);
     toast.error("Failed to update stock");
     throw error;
   }
+
+  toast.success(`Stock updated to ${newQuantity}`);
 }
