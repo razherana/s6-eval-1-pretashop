@@ -87,7 +87,7 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
       icon: "file-spreadsheet",
       acceptedFiles: ".csv",
       required: true,
-      description: "reference, specificité, karazany, stock_initial, prix_vente_ttc"
+      description: "reference, specificité, karazany, stock_initial, prix_vente_ttc, available_date (optional)"
     },
     {
       id: "customers",
@@ -181,7 +181,8 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
         fileStates.variants!,
         delimiter,
         decimalSeparator,
-        languageIds
+        languageIds,
+        productsImport.availableDateReferenceMap
       );
 
       progressInterval = setInterval(() => {

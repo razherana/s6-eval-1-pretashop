@@ -15,6 +15,8 @@ import { productOptionValueSchema } from "@/schemas/product-option-value";
 import { combinationSchema } from "@/schemas/combination";
 import { stockAvailableSchema } from "@/schemas/stock-available";
 import type { TaxReadXML } from "../types";
+import { parse } from "date-fns";
+import { utc } from "@date-fns/utc";
 
 interface ProductReferenceMap {
   [reference: string]: number; // product reference -> product ID
@@ -358,6 +360,7 @@ async function createCombination(
   price: string | undefined,
   reference: string,
   productInfoCache: ProductInfoCache,
+  availableDate?: string,
 ): Promise<number> {
   const converter = new PrestaShopXMLConverter(combinationSchema, "");
 
@@ -391,6 +394,10 @@ async function createCombination(
 
       data.price = priceImpact.toFixed(6);
     }
+  }
+
+  if (availableDate) {
+    data.available_date = availableDate;
   }
 
   data.product_option_value_ids = attributeValueIds.join(",");
@@ -507,10 +514,7 @@ async function getOrCreateStockAvailable(
 }
 
 export async function importVariantsFromFile(
-  file: File,
-  delimiter: string,
-  decimalSeparator: string,
-  languageIds: number[] = [1, 2, 3],
+file: File, delimiter: string, decimalSeparator: string, languageIds: number[], availableDateReferenceMap: Record<string, string>,
 ): Promise<ImportResult> {
   const parsedRows = await parseCsvFile(file, delimiter);
 
@@ -606,6 +610,24 @@ export async function importVariantsFromFile(
       const stockInitial = row.stock_initial || "0";
       const prixVenteTtc = row.prix_vente_ttc;
 
+      // Parse available date if provided
+      let availableDate: string | undefined;
+      if (row.available_date) {
+        try {
+          availableDate = parse(row.available_date, "dd/MM/yyyy", new Date(), { in: utc })
+            .toISOString()
+            .split("T")[0];
+        } catch (error) {
+          console.warn(
+            `Failed to parse available_date for variant at row ${index + 1}:`,
+            error,
+          );
+        }
+      } else {
+        // Else try to get it from the product import map if available
+        availableDate = availableDateReferenceMap[reference || ""] || undefined;
+      }
+
       // Validate required fields
       if (!reference) {
         rows.push({
@@ -699,6 +721,7 @@ export async function importVariantsFromFile(
           prixVenteTtc,
           reference,
           productInfoCache,
+          availableDate,
         );
 
         // Now fetch the stock_available ID that was auto-created

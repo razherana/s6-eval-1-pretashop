@@ -39,6 +39,11 @@ export const combinationSchema: XmlApiSchema = {
         type: "simple",
         attributes: {},
       },
+      available_date: {
+        xmlTag: "available_date",
+        type: "simple",
+        attributes: {},
+      },
     } as DataXmlApiSchema["fields"],
     multiLangFields: {},
     associations: {

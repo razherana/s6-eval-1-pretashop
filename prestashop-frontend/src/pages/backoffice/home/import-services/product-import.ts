@@ -265,10 +265,11 @@ export async function importProductsFromFile(
   delimiter: string,
   decimalSeparator: string,
   languageIds: number[],
-): Promise<ImportResult> {
+): Promise<ImportResult & { availableDateReferenceMap : Record<string, string> }> {
   const parsedRows = await parseCsvFile(file, delimiter);
   const converter = new PrestaShopXMLConverter(productSchema, "");
   const rows: ImportedRow[] = [];
+  const availableDateReferenceMap: Record<string, string> = {};
 
   const customLocale = {
     delimiters: {
@@ -338,6 +339,7 @@ export async function importProductsFromFile(
         success: false,
         error: "Failed to prepare categories and taxes",
       })),
+      availableDateReferenceMap: {},
     };
   }
 
@@ -374,6 +376,8 @@ export async function importProductsFromFile(
         condition: "new",
         minimal_quantity: "1",
       };
+
+      availableDateReferenceMap[row.reference] = productData.available_date;
 
       // Set name for all languages
       if (row.nom) {
@@ -426,5 +430,6 @@ export async function importProductsFromFile(
   return {
     summary: buildImportSummary("Products", file.name, rows),
     rows,
+    availableDateReferenceMap,
   };
 }
