@@ -329,10 +329,7 @@ export async function fetchProductCombinations(
       };
     }>(`/combinations?${query.toString()}`, { method: "GET" });
 
-    const combinations = response.combinations?.combination || [];
-    const combinationsArray = Array.isArray(combinations)
-      ? combinations
-      : [combinations];
+    const combinationsArray = assureArray(response.combinations.combination);
 
     // Cache the result
     if (cache) {

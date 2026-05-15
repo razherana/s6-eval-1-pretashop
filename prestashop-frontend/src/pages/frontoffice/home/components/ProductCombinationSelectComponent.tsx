@@ -19,6 +19,7 @@ interface CombinationOption {
   ean13?: string;
   upc?: string;
   minimal_quantity: number;
+  availableDate: string;
   attributeNames: string[];
   // Group attributes by option name for better display
   attributesByGroup: Map<string, string>;
@@ -41,6 +42,34 @@ export function ProductCombinationSelectComponent({
   const [loading, setLoading] = useState(true);
 
   const languageId = language?.language_id || 1;
+
+  // Helper to determine if a combination is HOT or NEW based on available_date
+  const getCombinationBadge = (availableDate: string): { type: 'hot' | 'new' | null; label: string } => {
+    if (!availableDate) return { type: null, label: '' };
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const today = new Date(now);
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const oneWeekAgo = new Date(now);
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const comboDate = new Date(availableDate);
+    comboDate.setHours(0, 0, 0, 0);
+
+    if (comboDate >= yesterday && comboDate <= today) {
+      return { type: 'hot', label: 'HOT' };
+    }
+
+    if (comboDate >= oneWeekAgo && comboDate < yesterday) {
+      return { type: 'new', label: 'NEW' };
+    }
+
+    return { type: null, label: '' };
+  };
 
   const getAttributeDisplayName = useCallback(
     (optionValueId: number): string => {
@@ -117,6 +146,7 @@ export function ProductCombinationSelectComponent({
           ean13: comb.ean13,
           upc: comb.upc,
           minimal_quantity: comb.minimal_quantity || 1,
+          availableDate: comb.available_date,
           attributeNames,
           attributesByGroup,
         };
@@ -147,7 +177,7 @@ export function ProductCombinationSelectComponent({
 
     if (combination) {
       // Fetch the product with the price with tax calculation for this combination
-      const price : number = await fetchProductCombinationPrice(combination.id, productId);
+      const price: number = await fetchProductCombinationPrice(combination.id, productId);
       onSelect(combination, price);
     }
   };
@@ -168,7 +198,7 @@ export function ProductCombinationSelectComponent({
           <SelectItem value="default">Default</SelectItem>
           {combinations.map((combination) => {
             // Build a nice display string
-            let displayName : string;
+            let displayName: string;
 
             if (combination.attributesByGroup.size > 0) {
               // Show as "Size: Large, Color: Blue"
@@ -181,13 +211,27 @@ export function ProductCombinationSelectComponent({
               displayName = combination.reference || `Variant #${combination.id}`;
             }
 
+            const badge = getCombinationBadge(combination.availableDate);
+
             return (
               <SelectItem
                 key={combination.id}
                 value={combination.id.toString()}
               >
                 <div className="flex items-center justify-between w-full gap-2">
-                  <span className="truncate">{displayName}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="truncate">{displayName}</span>
+                    {badge.type && (
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-bold leading-none ${badge.type === 'hot'
+                            ? 'bg-red-500 text-white'
+                            : 'bg-blue-500 text-white'
+                          }`}
+                      >
+                        {badge.label}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-xs text-muted-foreground shrink-0 ml-2">
                     {combination.reference && `REF: ${combination.reference}`}
                   </span>

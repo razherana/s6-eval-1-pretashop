@@ -58,6 +58,7 @@ export interface CombinationDetailXML {
     "#text": number;
   };
   reference: string;
+  available_date: string;
   price: number;
   ean13?: string;
   upc?: string;
