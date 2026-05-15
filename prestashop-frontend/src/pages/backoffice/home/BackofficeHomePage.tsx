@@ -1,3 +1,4 @@
+// src/pages/backoffice/home/BackofficeHomePage.tsx
 import { useEffect, useState } from 'react';
 import { type ProductReadXML } from './types';
 import { fetchProducts } from './services';
@@ -7,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, Package, AlertCircle, Zap, ClipboardList } from 'lucide-react';
+import { ShoppingCart, Package, AlertCircle, Zap, ClipboardList, Boxes } from 'lucide-react';
 import { ImportProductsModalComponent } from './components/ImportProductsModalComponent';
 import { ResetDataModalComponent } from './components/ResetDataModalComponent';
 import { getFormattedPrice, getWithLanguage, useLanguage } from '@/utils/lang';
@@ -17,6 +18,8 @@ import { useBackofficeAuth } from '@/hooks/useBackofficeAuth';
 import { FastResetModalComponent } from './components/FastResetModalComponent';
 import { LanguageLoadingComponent } from '@/components/ui-manual/language-loading-state';
 import { Link } from 'react-router-dom';
+import { assureArray } from '@/utils/xml';
+import { StockManagementModalComponent } from './components/StockManagementModalComponent';
 
 export function BackofficeHomePage() {
   const { logout } = useBackofficeAuth();
@@ -30,9 +33,13 @@ export function BackofficeHomePage() {
   const [importProductsOpen, setImportProductsOpen] = useState(false);
   const [isFastResetOpen, setFastResetOpen] = useState(false);
 
+  // Stock management state
+  const [selectedProductForStock, setSelectedProductForStock] = useState<ProductReadXML | null>(null);
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+
   const normalizeImages = (images: {
     id: number;
-  } | [{id:number;}]) => {
+  } | [{ id: number; }]) => {
     return Array.isArray(images) ? images : images ? [images] : [];
   };
 
@@ -106,6 +113,12 @@ export function BackofficeHomePage() {
         open={isFastResetOpen}
         setOpen={setFastResetOpen}
         onResetComplete={handleResetComplete}
+      />
+
+      <StockManagementModalComponent
+        open={isStockModalOpen}
+        setOpen={setIsStockModalOpen}
+        product={selectedProductForStock}
       />
 
       <div className="container mx-auto px-4 py-8">
@@ -192,8 +205,7 @@ export function BackofficeHomePage() {
               >
                 <div className="relative overflow-hidden bg-gray-100 dark:bg-gray-800">
                   {(() => {
-                    const images = product.associations.images.image;
-                    const normalizedImages = Array.isArray(images) ? images : images ? [images] : [];
+                    const normalizedImages = assureArray(product.associations.images.image);
                     return normalizedImages.length > 0 ? (
                       <ProductImageCarouselComponent
                         images={normalizedImages}
@@ -229,10 +241,17 @@ export function BackofficeHomePage() {
 
                 <CardFooter className="border-t bg-gray-50/50 dark:bg-gray-800/50">
                   <div className="flex w-full items-center justify-between text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Package className="h-4 w-4" />
-                      In Stock
-                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedProductForStock(product);
+                        setIsStockModalOpen(true);
+                      }}
+                    >
+                      <Boxes className="h-4 w-4 mr-1" />
+                      Stock
+                    </Button>
                     {(() => {
                       const normalizedImages = normalizeImages(product.associations.images.image);
                       return normalizedImages.length > 1 && (

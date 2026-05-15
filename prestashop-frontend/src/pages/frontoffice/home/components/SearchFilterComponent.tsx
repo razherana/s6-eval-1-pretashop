@@ -95,7 +95,7 @@ export function SearchFilterComponent() {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-6 pb-4 pt-2 px-2">
           {/* Name Search */}
           <div className="space-y-2">
             <Label htmlFor="search-name">Product Name</Label>
@@ -200,7 +200,7 @@ export function SearchFilterComponent() {
           </div>
         </div>
 
-        <DialogFooter className="flex gap-2 sm:gap-0">
+        <DialogFooter className="flex gap-2">
           <Button
             variant="outline"
             onClick={handleReset}
