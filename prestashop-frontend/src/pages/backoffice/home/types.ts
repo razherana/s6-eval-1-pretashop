@@ -97,6 +97,8 @@ export interface OrderReadXML {
   reference: string;
   total_paid: number;
   total_paid_tax_incl: number;
+  total_products_wt: number;
+  total_products: number;
   payment: string;
   current_state: {
     "#text": number;

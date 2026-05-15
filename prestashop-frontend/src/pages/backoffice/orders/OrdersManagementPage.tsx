@@ -2,10 +2,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/hooks/useLanguage";
+// Update imports
 import {
-  fetchAllOrders,
+  fetchAllOrdersWithCarts, // Changed from fetchAllOrders
   fetchAllOrderStates,
   fetchOrderDetailsById,
+  fetchCartDetails, // New import
   processDeliveryAndPayment,
 } from "./services/orderServices";
 import { LanguageLoadingComponent } from "@/components/ui-manual/language-loading-state";
@@ -92,7 +94,7 @@ export function OrdersManagementPage() {
       await processDeliveryAndPayment(order);
 
       // Reload orders
-      const ordersData = await fetchAllOrders(100);
+      const ordersData = await fetchAllOrdersWithCarts(100);
       setOrders(ordersData);
     } catch (error) {
       console.error("Error processing delivery:", error);
@@ -118,14 +120,14 @@ export function OrdersManagementPage() {
       setError(null);
 
       const [ordersData, statesData] = await Promise.all([
-        fetchAllOrders(100),
+        fetchAllOrdersWithCarts(100), // Now includes carts as pseudo-orders
         fetchAllOrderStates(),
       ]);
 
       setOrders(ordersData);
 
       const statesMap = new Map<number, OrderStateXML>();
-      statesData.forEach(state => statesMap.set(state.id, state));
+      statesData.forEach((state) => statesMap.set(state.id, state));
       setOrderStates(statesMap);
     } catch (err) {
       console.error("Error loading data:", err);
@@ -144,13 +146,19 @@ export function OrdersManagementPage() {
   const handleViewOrder = async (order: OrderReadXML) => {
     setSelectedOrder(order);
     setShowOrderModal(true);
-
     setLoadingDetails(true);
+
     try {
-      const details = await fetchOrderDetailsById(order.id);
-      setOrderDetails(Array.isArray(details) ? details : [details]);
+      // Check if it's a cart (reference starts with "CART-")
+      if (order.reference?.startsWith("CART-")) {
+        const details = await fetchCartDetails(order.id);
+        setOrderDetails(details);
+      } else {
+        const details = await fetchOrderDetailsById(order.id);
+        setOrderDetails(Array.isArray(details) ? details : [details]);
+      }
     } catch (error) {
-      console.error("Error loading order details:", error);
+      console.error("Error loading details:", error);
     } finally {
       setLoadingDetails(false);
     }
@@ -173,7 +181,7 @@ export function OrdersManagementPage() {
       await updateOrderState(selectedOrder.id, parseInt(selectedStateId));
 
       // Reload orders
-      const ordersData = await fetchAllOrders(100);
+      const ordersData = await fetchAllOrdersWithCarts(100);
       setOrders(ordersData);
 
       toast.success("Order state updated successfully");
@@ -355,7 +363,8 @@ export function OrdersManagementPage() {
                     <TableHead className="w-20">ID</TableHead>
                     <TableHead>Reference</TableHead>
                     <TableHead>Payment</TableHead>
-                    <TableHead>Total</TableHead>
+                    <TableHead>Total Products</TableHead>
+                    <TableHead>Total Paid</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-20">Actions</TableHead>
                   </TableRow>
@@ -363,7 +372,7 @@ export function OrdersManagementPage() {
                 <TableBody>
                   {filteredOrders.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={999} className="text-center py-8 text-muted-foreground">
                         <ShoppingBag className="h-8 w-8 mx-auto mb-2 opacity-50" />
                         No orders found
                       </TableCell>
@@ -386,6 +395,14 @@ export function OrdersManagementPage() {
                             {order.reference}
                           </TableCell>
                           <TableCell>{order.payment}</TableCell>
+                          <TableCell className="font-medium">
+                            {getFormattedPrice(
+                              order.total_products_wt,
+                              language.currency,
+                              language.conversion_change,
+                              language.locale
+                            )}
+                          </TableCell>
                           <TableCell className="font-medium">
                             {getFormattedPrice(
                               order.total_paid_tax_incl,
