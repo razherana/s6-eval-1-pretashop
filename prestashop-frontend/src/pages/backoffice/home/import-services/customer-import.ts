@@ -339,7 +339,7 @@ async function fetchProductReferences(): Promise<ProductReferenceMap> {
 }
 
 // Create cart with products
-async function createCart(
+export async function createCart(
   items: Array<{ productId: number; combinationId?: number; quantity: number }>,
   customerId: number,
   addressId: number,
@@ -407,7 +407,7 @@ async function createCart(
 }
 
 // Create order
-async function createOrder(
+export async function createOrder(
   cartId: number,
   customerId: number,
   addressId: number,
@@ -417,7 +417,7 @@ async function createOrder(
   languageData: LanguageData,
   date_add_to_use?: string,
   initialStateId: (typeof ORDER_STATES)[keyof typeof ORDER_STATES] = ORDER_STATES.AWAITING_CASH_ON_DELIVERY,
-): Promise<{ id: number; reference: string }> {
+): Promise<OrderReadXML> {
   const converter = new PrestaShopXMLConverter(orderSchema, "");
 
   const orderData: Record<string, string> = {
@@ -531,7 +531,7 @@ async function createOrder(
 }
 
 // Update order state
-async function updateOrderState(
+export async function updateOrderState(
   orderId: number,
   orderStateId: number,
   date_add?: string,
@@ -586,12 +586,13 @@ async function updateOrderState(
 }
 
 // Add payment to order
-async function addOrderPayment(
+export async function addOrderPayment(
   orderId: number,
   orderReference: string,
   amount: number,
   date_add?: string,
   paymentMethod: string = "Cash On Delivery",
+  currencyId: number = DEFAULT_CURRENCY_ID,
 ): Promise<OrderPaymentXML> {
   const converter = new PrestaShopXMLConverter(orderPaymentSchema, "");
 
@@ -599,7 +600,7 @@ async function addOrderPayment(
 
   const paymentData: Record<string, string> = {
     order_reference: orderReference,
-    id_currency: DEFAULT_CURRENCY_ID.toString(),
+    id_currency: currencyId.toString(),
     amount: amount.toFixed(2),
     payment_method: paymentMethod,
     conversion_rate: "1",
@@ -753,7 +754,7 @@ function getOrderFlow(status: string): {
 }
 
 // Process complete order flow (shipped -> delivered -> payment)
-async function processCompleteOrderFlow(
+export async function processCompleteOrderFlow(
   orderId: number,
   orderReference: string,
   totalAmount: number,

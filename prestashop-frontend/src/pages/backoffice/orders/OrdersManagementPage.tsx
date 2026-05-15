@@ -5,9 +5,8 @@ import { useLanguage } from "@/hooks/useLanguage";
 import {
   fetchAllOrders,
   fetchAllOrderStates,
-  updateOrderState,
   fetchOrderDetailsById,
-  processDeliveryAndPayment
+  processDeliveryAndPayment,
 } from "./services/orderServices";
 import { LanguageLoadingComponent } from "@/components/ui-manual/language-loading-state";
 import { Button } from "@/components/ui/button";
@@ -65,11 +64,13 @@ import {
   RefreshCw,
   type LucideProps,
   CheckCheck,
+  ShoppingCart,
 } from "lucide-react";
 import { getFormattedPrice, getWithLanguage } from "@/utils/lang";
 import { toast } from "sonner";
 import type { OrderReadXML, OrderDetailReadXML, OrderStateXML } from "@/pages/backoffice/home/types";
 import { SelectLanguageCurrency } from "@/components/ui-manual/select-lang";
+import { updateOrderState } from "../home/import-services/customer-import";
 
 export function OrdersManagementPage() {
   const navigate = useNavigate();
@@ -189,7 +190,20 @@ export function OrdersManagementPage() {
     const id = typeof stateId === 'string' ? parseInt(stateId) : stateId;
     const state = orderStates.get(id);
 
-    if (!state) return { name: `State #${id}`, color: "text-gray-600 bg-gray-100", icon: AlertCircle };
+    if (!state) {
+      if (id !== 0)
+        return {
+          name: `State #${id}`,
+          color: "text-gray-600 bg-gray-100",
+          icon: AlertCircle
+        };
+
+      return {
+        name: `In cart`,
+        color: "text-gray-600 bg-gray-100",
+        icon: ShoppingCart
+      }
+    }
 
     const stateName = language ? getWithLanguage(state.name, language.language_id) : `State #${id}`;
 
