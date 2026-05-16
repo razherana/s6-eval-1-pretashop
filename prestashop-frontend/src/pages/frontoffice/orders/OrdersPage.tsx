@@ -4,12 +4,18 @@ import { useNavigate } from "react-router-dom";
 import { useFrontofficeAuth } from "@/hooks/useFrontofficeAuth";
 import { useFrontofficeData } from "@/hooks/useFrontofficeData";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useCart } from "@/hooks/useCart";
 import { fetchCustomerOrders } from "@/pages/frontoffice/orders/services";
+import {
+  getSavedCarts,
+  cartToCartItems,
+  deleteCart,
+  type UserCart,
+} from "@/pages/frontoffice/home/services/cartService";
+import type { CartItem } from "@/contexts/CartContext";
 import { LanguageLoadingComponent } from "@/components/ui-manual/language-loading-state";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -28,26 +34,44 @@ import {
   AlertCircle,
   FileText,
   History,
-  type LucideProps
+  ShoppingCart,
+  Trash2,
+  Plus,
+  type LucideProps,
 } from "lucide-react";
 import { getFormattedPrice, getWithLanguage } from "@/utils/lang";
 import type { OrderReadXML } from "@/pages/backoffice/home/types";
 import { OrderDetailsComponent } from "./components/OrderDetailsComponent";
 import { OrderHistoryComponent } from "./components/OrderHistoryComponent";
+import { OrdersTabContent } from "./components/OrdersTabContent";
+import { SavedCartsTabContent } from "./components/SavedCartsTabContent";
 import { FrontofficeProtectedLayout } from "@/components/layout/FrontofficeProtectedLayout";
 import { FrontofficeDataLoadingComponent } from "@/components/ui-manual/frontofficedata-loading-state";
+import { toast } from "sonner";
+import { API_QUERY } from "@/utils/url";
 
 export function OrdersPage() {
   const navigate = useNavigate();
   const { authData } = useFrontofficeAuth();
   const { data } = useFrontofficeData();
   const { language } = useLanguage();
+  const { addToCart } = useCart();
 
   const [orders, setOrders] = useState<OrderReadXML[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<OrderReadXML | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
+
+  // Saved carts state
+  const [savedCarts, setSavedCarts] = useState<UserCart[]>([]);
+  const [savedCartItemsMap, setSavedCartItemsMap] = useState<
+    Map<number, CartItem[]>
+  >(new Map());
+  const [loadingCarts, setLoadingCarts] = useState(false);
+  const [selectedCart, setSelectedCart] = useState<UserCart | null>(null);
+  const [selectedCartItems, setSelectedCartItems] = useState<CartItem[]>([]);
+  const [showCartModal, setShowCartModal] = useState(false);
 
   const loadOrders = useCallback(async () => {
     if (!authData.user?.id) return;
@@ -63,7 +87,84 @@ export function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [authData.user?.id]);
+  }, [authData.user]);
+
+  const loadSavedCarts = useCallback(async () => {
+    if (!authData.user?.id) return;
+
+    try {
+      setLoadingCarts(true);
+      const carts = await getSavedCarts(authData.user.id);
+      setSavedCarts(carts);
+
+      const itemsMap = new Map<number, CartItem[]>();
+      for (const cart of carts) {
+        try {
+          const items = await cartToCartItems(cart);
+          itemsMap.set(cart.id, items);
+        } catch (err) {
+          console.error(`Error loading items for cart ${cart.id}:`, err);
+          itemsMap.set(cart.id, []);
+        }
+      }
+      setSavedCartItemsMap(itemsMap);
+    } catch (err) {
+      console.error("Error loading saved carts:", err);
+    } finally {
+      setLoadingCarts(false);
+    }
+  }, [authData.user]);
+
+  const handleDeleteCart = useCallback(
+    async (cartId: number) => {
+      try {
+        await deleteCart(cartId);
+        toast.success("Saved cart deleted");
+        await loadSavedCarts();
+      } catch (err) {
+        console.error("Error deleting cart:", err);
+        toast.error("Failed to delete cart");
+      }
+    },
+    [loadSavedCarts],
+  );
+
+  const handleViewCart = (cart: UserCart) => {
+    setSelectedCart(cart);
+    setSelectedCartItems(savedCartItemsMap.get(cart.id) || []);
+    setShowCartModal(true);
+  };
+
+  const handleAddToActiveCart = async (cart: UserCart) => {
+    const items = savedCartItemsMap.get(cart.id) || [];
+    if (items.length === 0) {
+      toast.info("This cart is empty");
+      return;
+    }
+
+    // Add each item from the saved cart into the active cart context
+    for (const item of items) {
+      addToCart(
+        {
+          productId: item.productId,
+          combinationId: item.combinationId,
+          name: item.name,
+          price: item.price,
+          image: item.image,
+          reference: item.reference,
+          combinationReference: item.combinationReference,
+        },
+        item.quantity,
+      );
+    }
+
+    toast.success(
+      `${items.reduce((sum, i) => sum + i.quantity, 0)} item(s) added to your active cart`,
+    );
+
+    await handleDeleteCart(cart.id);
+    navigate("/frontoffice/home");
+  };
 
   useEffect(() => {
     if (!authData.isAuthenticated) {
@@ -72,9 +173,9 @@ export function OrdersPage() {
     }
 
     (async () => {
-      await loadOrders();
+      await Promise.all([loadOrders(), loadSavedCarts()]);
     })();
-  }, [authData, loadOrders, navigate]);
+  }, [authData, loadOrders, loadSavedCarts, navigate]);
 
   const getOrderStateInfo = useCallback((stateId: string | number) => {
     const id = typeof stateId === 'string' ? parseInt(stateId) : stateId;
@@ -147,104 +248,46 @@ export function OrdersPage() {
 
         {/* Main Content */}
         <main className="container mx-auto px-4 py-8">
-          {loading ? (
-            <div className="space-y-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Card key={i}>
-                  <CardHeader>
-                    <Skeleton className="h-6 w-48" />
-                  </CardHeader>
-                  <CardContent>
-                    <Skeleton className="h-4 w-full mb-2" />
-                    <Skeleton className="h-4 w-3/4" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : error ? (
-            <div className="text-center py-12">
-              <AlertCircle className="h-12 w-12 mx-auto text-destructive mb-4" />
-              <p className="text-lg text-destructive mb-4">{error}</p>
-              <Button onClick={loadOrders}>Try Again</Button>
-            </div>
-          ) : orders.length === 0 ? (
-            <div className="text-center py-12">
-              <ShoppingBag className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <h2 className="text-2xl font-bold mb-2">No Orders Yet</h2>
-              <p className="text-muted-foreground mb-6">
-                You haven't placed any orders yet. Start shopping!
-              </p>
-              <Button onClick={() => navigate("/frontoffice/home")}>
-                Browse Products
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {orders.map((order) => {
-                const stateInfo = getOrderStateInfo(
-                  typeof order.current_state === 'object' 
-                    ? order.current_state["#text"] 
-                    : order.current_state
-                );
-                const StateIcon = stateInfo.icon;
+          <Tabs defaultValue="orders" className="space-y-6">
+            <TabsList className="w-full grid grid-cols-2 max-w-md">
+              <TabsTrigger value="orders" className="flex items-center gap-2">
+                <ShoppingBag className="h-4 w-4" />
+                Orders
+              </TabsTrigger>
+              <TabsTrigger value="saved-carts" className="flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4" />
+                Saved Carts
+              </TabsTrigger>
+            </TabsList>
 
-                return (
-                  <Card 
-                    key={order.id} 
-                    className="hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => handleViewOrder(order)}
-                  >
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <CardTitle className="text-lg">
-                            Order #{order.reference}
-                          </CardTitle>
-                          <p className="text-sm text-muted-foreground">
-                            Order ID: {order.id}
-                          </p>
-                        </div>
-                        <Badge className={stateInfo.color}>
-                          <StateIcon className="h-3 w-3 mr-1" />
-                          {stateInfo.name}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <p className="text-sm">
-                            <span className="text-muted-foreground">Payment: </span>
-                            {order.payment}
-                          </p>
-                          <p className="text-lg font-bold">
-                            {getFormattedPrice(
-                              order.total_paid,
-                              language.currency,
-                              language.conversion_change,
-                              language.locale
-                            )}
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewOrder(order);
-                            }}
-                          >
-                            View Details
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+            {/* Orders Tab */}
+            <TabsContent value="orders">
+              <OrdersTabContent
+                orders={orders}
+                loading={loading}
+                error={error}
+                language={language}
+                getOrderStateInfo={getOrderStateInfo}
+                onViewOrder={handleViewOrder}
+                onRetry={loadOrders}
+                navigate={navigate}
+              />
+            </TabsContent>
+
+            {/* Saved Carts Tab */}
+            <TabsContent value="saved-carts">
+              <SavedCartsTabContent
+                savedCarts={savedCarts}
+                savedCartItemsMap={savedCartItemsMap}
+                loadingCarts={loadingCarts}
+                language={language}
+                onViewCart={handleViewCart}
+                onAddToActiveCart={handleAddToActiveCart}
+                onDeleteCart={handleDeleteCart}
+                navigate={navigate}
+              />
+            </TabsContent>
+          </Tabs>
         </main>
 
         {/* Order Details Modal */}
@@ -299,13 +342,13 @@ export function OrdersPage() {
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Status</span>
                         <Badge className={getOrderStateInfo(
-                          typeof selectedOrder.current_state === 'object' 
-                            ? selectedOrder.current_state["#text"] 
+                          typeof selectedOrder.current_state === 'object'
+                            ? selectedOrder.current_state["#text"]
                             : selectedOrder.current_state
                         ).color}>
                           {getOrderStateInfo(
-                            typeof selectedOrder.current_state === 'object' 
-                              ? selectedOrder.current_state["#text"] 
+                            typeof selectedOrder.current_state === 'object'
+                              ? selectedOrder.current_state["#text"]
                               : selectedOrder.current_state
                           ).name}
                         </Badge>
@@ -326,6 +369,165 @@ export function OrdersPage() {
                   />
                 </TabsContent>
               </Tabs>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Saved Cart Details Modal */}
+        <Dialog open={showCartModal} onOpenChange={setShowCartModal}>
+          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                <ShoppingCart className="h-5 w-5" />
+                {selectedCart && (
+                  <span>
+                    Saved Cart #{selectedCart.id}
+                    <span className="text-sm text-muted-foreground ml-2">
+                      ({selectedCartItems.length} item
+                      {selectedCartItems.length !== 1 ? "s" : ""})
+                    </span>
+                  </span>
+                )}
+              </DialogTitle>
+            </DialogHeader>
+
+            {selectedCart && language && (
+              <div className="flex-1 overflow-auto mt-4">
+                {selectedCartItems.length === 0 ? (
+                  <div className="text-center py-12">
+                    <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-lg font-medium mb-2">Empty Cart</p>
+                    <p className="text-muted-foreground mb-4">
+                      This cart has no items.
+                    </p>
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        handleDeleteCart(selectedCart.id);
+                        setShowCartModal(false);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete This Cart
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="bg-muted p-4 rounded-lg space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Cart ID</span>
+                        <span className="font-medium">#{selectedCart.id}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Saved On</span>
+                        <span className="font-medium">
+                          {new Date(selectedCart.date_add).toLocaleDateString(
+                            undefined,
+                            {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            },
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          Total Items
+                        </span>
+                        <span className="font-bold">
+                          {selectedCartItems.reduce(
+                            (sum, i) => sum + i.quantity,
+                            0,
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          Estimated Total
+                        </span>
+                        <span className="font-bold">
+                          {getFormattedPrice(
+                            selectedCartItems.reduce(
+                              (sum, i) => sum + i.price * i.quantity,
+                              0,
+                            ),
+                            language.currency,
+                            language.conversion_change,
+                            language.locale,
+                          )}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <h3 className="font-semibold">Cart Items</h3>
+                      {selectedCartItems.map((item) => (
+                        <div
+                          key={`modal-${item.productId}-${item.combinationId ?? 0}`}
+                          className="flex items-center gap-4 p-3 border rounded-lg"
+                        >
+                          {item.image && (
+                            <img
+                              src={`${item.image}?${API_QUERY}`}
+                              alt={item.name}
+                              className="w-16 h-16 rounded-md object-cover border"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">
+                              {item.name}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Ref: {item.reference}
+                              {item.combinationReference &&
+                                ` (${item.combinationReference})`}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">
+                              {getFormattedPrice(
+                                item.price,
+                                language.currency,
+                                language.conversion_change,
+                                language.locale,
+                              )}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              x{item.quantity}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="default"
+                        onClick={() => {
+                          handleAddToActiveCart(selectedCart);
+                          setShowCartModal(false);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Use This Cart
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => {
+                          handleDeleteCart(selectedCart.id);
+                          setShowCartModal(false);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Cart
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </DialogContent>
         </Dialog>

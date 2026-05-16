@@ -296,6 +296,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         isOpen,
         setIsOpen,
         isLoadingCart,
+        cartId,
       }}
     >
       {children}

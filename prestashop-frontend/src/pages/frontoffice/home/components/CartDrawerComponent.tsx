@@ -1,5 +1,7 @@
 // src/components/CartDrawer.tsx
+import { useState } from 'react';
 import { useCart } from '@/hooks/useCart';
+import { useFrontofficeAuth } from '@/hooks/useFrontofficeAuth';
 import {
   Sheet,
   SheetContent,
@@ -10,9 +12,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { ShoppingCart, Minus, Plus, Trash2 } from 'lucide-react';
+import { ShoppingCart, Minus, Plus, Trash2, Save } from 'lucide-react';
 import { API_QUERY } from '@/utils/url';
 import { Spinner } from '@/components/ui/spinner';
+import { saveCart } from '../services/cartService';
+import { toast } from 'sonner';
 
 export function CartDrawerComponent({
   setIsCheckoutOpen
@@ -28,8 +32,44 @@ export function CartDrawerComponent({
     totalPrice,
     isOpen,
     setIsOpen,
-    isLoadingCart
+    isLoadingCart,
   } = useCart();
+
+  const { authData } = useFrontofficeAuth();
+  const [saving, setSaving] = useState(false);
+
+  const handleSaveCart = async () => {
+    if (!authData.user?.id) {
+      toast.error('You must be logged in to save a cart');
+      return;
+    }
+
+    if (items.length === 0) {
+      toast.info('Your cart is empty');
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      // The CartProvider auto-syncs the active cart to the database,
+      // so if cartId already exists the cart is already persisted.
+      // We save a new snapshot anyway so it appears in "Saved Carts"
+      // even after the active cart gets cleared and auto-deleted.
+      await saveCart(items, authData.user.id);
+
+      // This clears the active cart and deletes it from the database
+      clearCart();
+
+      toast.success('Cart saved for later!');
+      setIsOpen(false);
+    } catch (err) {
+      console.error('Error saving cart:', err);
+      toast.error('Failed to save cart');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -204,6 +244,17 @@ export function CartDrawerComponent({
                 }}
               >
                 Proceed to Checkout
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full"
+                size="lg"
+                onClick={handleSaveCart}
+                disabled={saving}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? 'Saving...' : 'Save cart for later'}
               </Button>
             </div>
           </>

@@ -27,6 +27,7 @@ export interface CartContextType {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
   isLoadingCart?: boolean;
+  cartId: number | null;
 }
 
 export const CartContext = createContext<CartContextType | undefined>(undefined);
