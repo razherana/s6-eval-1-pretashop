@@ -258,7 +258,9 @@ export interface TaxRuleReadXML {
 
 export interface ProductOptionValueDetail {
   id: number;
-  id_attribute_group: number;
+  id_attribute_group: number | {
+    "#text": number;
+  };
   name: LanguageField;
   color?: string;
   position?: number;

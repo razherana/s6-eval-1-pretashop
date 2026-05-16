@@ -248,7 +248,7 @@ export async function fetchInitialProducts(
 }
 
 // Fetch all product options (like Size, Color) - rarely changes
-async function fetchAllProductOptions(): Promise<ProductOptionXML[]> {
+export async function fetchAllProductOptions(): Promise<ProductOptionXML[]> {
   const query = new URLSearchParams({ display: "full" });
 
   try {
@@ -267,7 +267,7 @@ async function fetchAllProductOptions(): Promise<ProductOptionXML[]> {
 }
 
 // Fetch all product option values (like Blue, Large, Cotton) - rarely changes
-async function fetchAllProductOptionValues(): Promise<
+export async function fetchAllProductOptionValues(): Promise<
   ProductOptionValueDetail[]
 > {
   const query = new URLSearchParams({ display: "full" });
@@ -325,7 +325,7 @@ export async function fetchProductCombinations(
   try {
     const response = await fetchFromPrestashopApi<{
       combinations: {
-        combination?: CombinationDetailXML | CombinationDetailXML[];
+        combination: CombinationDetailXML | CombinationDetailXML[];
       };
     }>(`/combinations?${query.toString()}`, { method: "GET" });
 

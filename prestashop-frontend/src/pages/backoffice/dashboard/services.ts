@@ -4,12 +4,20 @@ import { format, parseISO } from "date-fns";
 import type {
   LanguageField,
   OrderReadXML,
+  CombinationDetailXML,
+  ProductOptionXML,
+  ProductOptionValueDetail,
 } from "@/pages/backoffice/home/types";
 import { ORDER_STATES } from "@/pages/backoffice/home/types";
 import { utc } from "@date-fns/utc";
 import { assureArray } from "@/utils/xml";
+import { getWithLanguage } from "@/utils/lang";
 import { fetchProducts } from "@/pages/backoffice/home/services";
-import { fetchProductCombinations } from "@/pages/frontoffice/home/services";
+import {
+  fetchProductCombinations,
+  fetchAllProductOptions,
+  fetchAllProductOptionValues,
+} from "@/pages/frontoffice/home/services";
 import { fetchProductStock } from "@/pages/backoffice/home/services/stockServices";
 
 export interface DailyStats {
@@ -34,6 +42,7 @@ export interface ProductStockRow {
   productReference: string;
   combinationId: number;
   combinationReference: string;
+  combinationName: string;
   stockId: number;
   quantity: number;
 }
@@ -188,10 +197,65 @@ export function prepareChartData(dailyStats: DailyStats[]) {
   }));
 }
 
+function buildCombinationName(
+  combination: CombinationDetailXML,
+  productOptions: Map<number, ProductOptionXML>,
+  productOptionValues: Map<number, ProductOptionValueDetail>,
+  languageId: number,
+): string {
+  const optionValues = combination.associations?.product_option_values
+    ?.product_option_value;
+  if (!optionValues) return `Variant #${combination.id}`;
+
+  const optionValuesArray = Array.isArray(optionValues)
+    ? optionValues
+    : [optionValues];
+
+  const parts: string[] = [];
+  for (const ov of optionValuesArray) {
+    const detail = productOptionValues.get(ov.id);
+    if (!detail) {
+      parts.push(`Option #${ov.id}`);
+      continue;
+    }
+    
+    const optionGroup = productOptions.get(
+      typeof detail.id_attribute_group === "object"
+      ? detail.id_attribute_group['#text']
+      : detail.id_attribute_group,
+    );
+
+    if (optionGroup) {
+      parts.push(
+        `${getWithLanguage(optionGroup.name, languageId)}: ${getWithLanguage(detail.name, languageId)}`,
+      );
+    } else {
+      parts.push(getWithLanguage(detail.name, languageId));
+    }
+  }
+  return parts.join("\n");
+}
+
 export async function fetchStockRowsForDashboard(): Promise<ProductStockRow[]> {
   const products = await fetchProducts(1000, 0);
   const productsWithCombinations = products.filter(
     (product) => product.associations?.combinations?.combination?.length > 0,
+  );
+
+  // Fetch all product options and option values to build combination names
+  const [allOptions, allOptionValues] = await Promise.all([
+    fetchAllProductOptions(),
+    fetchAllProductOptionValues(),
+  ]);
+
+  const productOptionsMap = new Map<number, ProductOptionXML>();
+  allOptions.forEach((opt: ProductOptionXML) =>
+    productOptionsMap.set(opt.id, opt),
+  );
+
+  const optionValuesMap = new Map<number, ProductOptionValueDetail>();
+  allOptionValues.forEach((val: ProductOptionValueDetail) =>
+    optionValuesMap.set(val.id, val),
   );
 
   const rows: ProductStockRow[] = [];
@@ -212,6 +276,12 @@ export async function fetchStockRowsForDashboard(): Promise<ProductStockRow[]> {
             productReference: product.reference || "",
             combinationId: combination.id,
             combinationReference: combination.reference || "",
+            combinationName: buildCombinationName(
+              combination,
+              productOptionsMap,
+              optionValuesMap,
+              1,
+            ),
             stockId: stock.id,
             quantity: stock.quantity,
           });

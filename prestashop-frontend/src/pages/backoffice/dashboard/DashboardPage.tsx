@@ -10,13 +10,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Table,
   TableBody,
   TableCell,
@@ -63,6 +56,7 @@ import { getFormattedPrice, getWithLanguage } from "@/utils/lang";
 import { LanguageLoadingComponent } from "@/components/ui-manual/language-loading-state";
 import { SelectLanguageCurrency } from "@/components/ui-manual/select-lang";
 import { utc } from "@date-fns/utc";
+import { StockHistoryDialog } from "./components/StockHistoryDialog";
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -74,7 +68,6 @@ export function DashboardPage() {
   const [stockRows, setStockRows] = useState<ProductStockRow[]>([]);
   const [stockLoading, setStockLoading] = useState(true);
   const [stockError, setStockError] = useState<string | null>(null);
-  const [stockHistoryDate, setStockHistoryDate] = useState<Date | null>(null);
   const [selectedStockRow, setSelectedStockRow] = useState<ProductStockRow | null>(null);
   const [isStockHistoryOpen, setIsStockHistoryOpen] = useState(false);
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
@@ -143,33 +136,6 @@ export function DashboardPage() {
     () => prepareChartData(dashboardData.dailyStats),
     [dashboardData],
   );
-
-  const filteredStockMovements = useMemo(() => {
-    if (!stockHistoryDate) return stockMovements;
-    const selectedDateStr = format(stockHistoryDate, "yyyy-MM-dd", { in: utc });
-    return stockMovements.filter(
-      (movement) => movement.date_add.slice(0, 10) <= selectedDateStr,
-    );
-  }, [stockHistoryDate, stockMovements]);
-
-  const stockMovementChartData = useMemo(() => {
-    const dailyMap = new Map<string, number>();
-    for (const movement of filteredStockMovements) {
-      const dateKey = movement.date_add.slice(0, 10);
-      const signedQuantity = movement.sign >= 0
-        ? movement.physical_quantity
-        : -movement.physical_quantity;
-      dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + signedQuantity);
-    }
-
-    return Array.from(dailyMap.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([date, quantity]) => ({
-        date: format(parseISO(date, { in: utc }), "dd/MM", { in: utc }),
-        quantity,
-        fullDate: date,
-      }));
-  }, [filteredStockMovements]);
 
   useEffect(() => {
     if (!isStockHistoryOpen || !selectedStockRow?.stockId) return;
@@ -259,7 +225,7 @@ export function DashboardPage() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         {/* Date Filter */}
-        {/* <div className="mb-8">
+        <div className="mb-8">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Label htmlFor="date-filter" className="text-sm font-medium">
@@ -272,9 +238,7 @@ export function DashboardPage() {
                 value={selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}
                 onChange={(e) =>
                   setSelectedDate(
-                    e.target.value
-                      ? new Date(e.target.value + "T00:00:00")
-                      : null,
+                    e.target.value ? parseISO(`${e.target.value}`, { in: utc }) : null,
                   )
                 }
               />
@@ -295,7 +259,7 @@ export function DashboardPage() {
               {format(selectedDate, "dd MMMM yyyy", { locale: fr })}
             </p>
           )}
-        </div> */}
+        </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -500,12 +464,8 @@ export function DashboardPage() {
                 id="stock-history-date"
                 type="date"
                 className="w-40"
-                value={stockHistoryDate ? format(stockHistoryDate, "yyyy-MM-dd") : ""}
-                onChange={(e) =>
-                  setStockHistoryDate(
-                    e.target.value ? new Date(`${e.target.value}T00:00:00`) : null,
-                  )
-                }
+                value={selectedDate ? format(selectedDate, "yyyy-MM-dd", { in: utc }) : ""}
+                readOnly
               />
             </div>
           </CardHeader>
@@ -526,7 +486,7 @@ export function DashboardPage() {
                   <TableRow>
                     <TableHead>Product</TableHead>
                     <TableHead>Combination</TableHead>
-                    <TableHead className="text-right">Reference</TableHead>
+                    <TableHead className="text-right">Ref.</TableHead>
                     <TableHead className="text-right">Stock</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -545,7 +505,16 @@ export function DashboardPage() {
                         {getWithLanguage(row.productName, language.language_id)}
                       </TableCell>
                       <TableCell>
-                        {row.combinationReference || `Variant #${row.combinationId}`}
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-medium whitespace-pre-line text-xs leading-relaxed">
+                            {row.combinationName}
+                          </span>
+                          {row.combinationReference && (
+                            <span className="text-xs text-muted-foreground">
+                              {row.combinationReference}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">
                         {row.productReference || "-"}
@@ -648,7 +617,7 @@ export function DashboardPage() {
         </Card>
       </main>
 
-      <Dialog
+      <StockHistoryDialog
         open={isStockHistoryOpen}
         onOpenChange={(open) => {
           setIsStockHistoryOpen(open);
@@ -657,107 +626,12 @@ export function DashboardPage() {
             setStockMovements([]);
           }
         }}
-      >
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Stock History</DialogTitle>
-            <DialogDescription>
-              {selectedStockRow
-                ? `${getWithLanguage(selectedStockRow.productName, language.language_id)} - ${selectedStockRow.combinationReference ||
-                `Variant #${selectedStockRow.combinationId}`
-                }`
-                : ""}
-            </DialogDescription>
-          </DialogHeader>
-
-          {stockMovementsLoading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-72 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {stockMovementChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={stockMovementChartData}>
-                    <defs>
-                      <linearGradient
-                        id="colorMovement"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="date" className="text-xs" />
-                    <YAxis className="text-xs" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "var(--background)",
-                        border: "1px solid var(--border)",
-                        borderRadius: "8px",
-                      }}
-                      formatter={(value) => [value, "Movement"]}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="quantity"
-                      name="Daily movement"
-                      stroke="#3b82f6"
-                      strokeWidth={2}
-                      fill="url(#colorMovement)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-52 text-muted-foreground">
-                  <p>No movement data for this period</p>
-                </div>
-              )}
-
-              {filteredStockMovements.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Sign</TableHead>
-                      <TableHead className="text-right">Quantity</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredStockMovements.map((movement) => (
-                      <TableRow key={movement.id}>
-                        <TableCell>
-                          {format(parseISO(movement.date_add.replace(" ", "T"), { in: utc }), "dd MMMM yyyy", {
-                            locale: fr,
-                          })}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant={movement.sign >= 0 ? "default" : "destructive"}>
-                            {movement.sign >= 0 ? "+" : "-"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {movement.physical_quantity}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="flex items-center justify-center py-8 text-muted-foreground">
-                  <p>No stock movements recorded</p>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+        selectedStockRow={selectedStockRow}
+        stockMovements={stockMovements}
+        stockMovementsLoading={stockMovementsLoading}
+        language={language}
+        stockHistoryDate={selectedDate}
+      />
     </div>
   );
 }

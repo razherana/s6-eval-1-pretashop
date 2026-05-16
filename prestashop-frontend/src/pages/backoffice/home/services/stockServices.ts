@@ -164,11 +164,38 @@ export async function updateStockQuantity(
     );
     const movementXml = movementConverter.convertRowToXML(stockMovementData);
 
-    await fetchFromPrestashopApi("/stock_movements", {
+    const movementResponse = await fetchFromPrestashopApi<{
+      stock_mvt: {
+        id: number;
+      };
+    }>("/stock_movements", {
       method: "POST",
       headers: { "Content-Type": "application/xml" },
       body: movementXml,
     });
+
+    const movementId = movementResponse.stock_mvt.id;
+    console.log(
+      `Created stock movement with ID ${movementId} for stock ${stockId}`,
+    );
+
+    // Update date_add
+    if (movementId) {
+      const updateData: Record<string, string> = {
+        date_add: dateAdd,
+        id: movementId.toString(),
+      };
+      const updateXml = movementConverter.convertRowToXML(updateData);
+
+      await fetchFromPrestashopApi(
+        `/stock_movements/${movementId}?ps_method=PATCH`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/xml" },
+          body: updateXml,
+        },
+      );
+    }
   } catch (error) {
     console.error("Error updating stock:", error);
     toast.error("Failed to update stock");
