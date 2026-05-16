@@ -17,6 +17,8 @@ import { stockAvailableSchema } from "@/schemas/stock-available";
 import type { TaxReadXML } from "../types";
 import { parse } from "date-fns";
 import { utc } from "@date-fns/utc";
+import { updateStockQuantity } from "../services/stockServices";
+import type { LanguageData } from "@/utils/lang";
 
 interface ProductReferenceMap {
   [reference: string]: number; // product reference -> product ID
@@ -460,27 +462,16 @@ async function createStockAvailable(
 async function updateStockAvailable(
   stockAvailableId: number,
   quantity: string,
+  language: LanguageData
 ): Promise<void> {
-  const converter = new PrestaShopXMLConverter(stockAvailableSchema, "");
-
-  const xmlData = converter.convertRowToXML({
-    id: stockAvailableId.toString(),
-    quantity: quantity || "0",
-  });
-
-  try {
-    await fetchFromPrestashopApi("/stock_availables?ps_method=PATCH", {
-      method: "POST",
-      headers: { "Content-Type": "application/xml" },
-      body: xmlData,
-    });
-  } catch (error) {
-    console.error(
-      `Error updating stock for stock available ${stockAvailableId}:`,
-      error,
-    );
-    throw error;
-  }
+  updateStockQuantity(
+    stockAvailableId,
+    0,
+    parseInt(quantity),
+    language,
+    false,
+    "Initial stock import",
+  );
 }
 
 async function getOrCreateStockAvailable(
@@ -519,7 +510,8 @@ export async function importVariantsFromFile(
   decimalSeparator: string,
   languageIds: number[],
   availableDateReferenceMap: Record<string, string>,
-  dateFormat: string
+  dateFormat: string,
+  language: LanguageData
 ): Promise<ImportResult> {
   const parsedRows = await parseCsvFile(file, delimiter);
 
@@ -671,7 +663,7 @@ export async function importVariantsFromFile(
             0, // id_product_attribute = 0 for default combination
             stockAvailableCache[productId],
           );
-          await updateStockAvailable(stockAvailableId, stockInitial);
+          await updateStockAvailable(stockAvailableId, stockInitial, language);
 
           rows.push({
             index: index + 1,
@@ -739,7 +731,7 @@ export async function importVariantsFromFile(
         );
 
         // Update stock quantity
-        await updateStockAvailable(stockAvailableId, stockInitial);
+        await updateStockAvailable(stockAvailableId, stockInitial, language);
 
         rows.push({
           index: index + 1,

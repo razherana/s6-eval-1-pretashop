@@ -42,6 +42,7 @@ const STEPS = [
   { id: 'stocks', label: 'Stocks', icon: <Box className="h-4 w-4" /> },
   { id: 'stock_movements', label: 'Stock Movements', icon: <ClipboardCheck className="h-4 w-4" /> },
   { id: 'addresses', label: 'Addresses', icon: <Pin className="h-4 w-4" /> },
+  { id: 'stock_movement_reasons', label: 'Stock Movements Reasons', icon: <ClipboardCheck className="h-4 w-4" /> },
 ];
 
 export function FastResetModalComponent({ open, setOpen, onResetComplete }: FastResetModalProps) {
@@ -214,10 +215,10 @@ export function FastResetModalComponent({ open, setOpen, onResetComplete }: Fast
         failed: stockResult.failedApiIds.length
       });
 
-      // Step 13: Stock movements reasons
+      // Step 13: Stock movements
       setCurrentStepIndex(12);
       updateStep(12, { status: "running" });
-      const stockMovementReasonsResult = await resetApi('stock_movement_reason', 'stock_movement_reasons');
+      const stockMovementReasonsResult = await resetApi('stock_movement', 'stock_movements', 'stock_mvt', 'stock_mvts');
       updateStep(12, {
         status: stockMovementReasonsResult.failedApiIds.length === 0 ? 'success' : 'failed',
         deleted: stockMovementReasonsResult.deletedApiIds.length,
@@ -233,6 +234,17 @@ export function FastResetModalComponent({ open, setOpen, onResetComplete }: Fast
         deleted: addressesResult.deletedApiIds.length,
         failed: addressesResult.failedApiIds.length
       });
+
+      // Step 15: Stock movements reasons
+      setCurrentStepIndex(14);
+      updateStep(14, { status: "running" });
+      const stockMovementReasons = await resetApi('stock_movement_reason', 'stock_movement_reasons');
+      updateStep(14, {
+        status: stockMovementReasons.failedApiIds.length === 0 ? 'success' : 'failed',
+        deleted: stockMovementReasons.deletedApiIds.length,
+        failed: stockMovementReasons.failedApiIds.length
+      });
+
 
       setCompleted(true);
 

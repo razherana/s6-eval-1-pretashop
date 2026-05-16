@@ -15,6 +15,7 @@ import { type ImportStep, type FileStates, type TotalStats } from "../services";
 import { useLanguage } from "@/utils/lang";
 import { toast } from "sonner";
 import { verifyDataForImport } from "../import-services/verify-import";
+import { LanguageLoadingComponent } from "@/components/ui-manual/language-loading-state";
 
 export function ImportProductsModalComponent({ open, setOpen }: { open: boolean, setOpen: React.Dispatch<React.SetStateAction<boolean>> }) {
   // File states
@@ -197,7 +198,8 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
         decimalSeparator,
         languageIds,
         productsImport.availableDateReferenceMap,
-        dateFormat
+        dateFormat,
+        language
       );
 
       progressInterval = setInterval(() => {
@@ -306,6 +308,9 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
     setImagesResults([]);
     setCurrentPage(1);
   };
+
+  if(!language)
+    return <LanguageLoadingComponent />;
 
   return (
     <Dialog open={open}>

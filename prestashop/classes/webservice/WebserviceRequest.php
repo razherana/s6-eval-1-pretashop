@@ -333,7 +333,7 @@ class WebserviceRequestCore
             'shops' => ['description' => 'Shops from multi-shop feature', 'class' => 'Shop'],
             'shop_groups' => ['description' => 'Shop groups from multi-shop feature', 'class' => 'ShopGroup'],
             'taxes' => ['description' => 'The tax rate', 'class' => 'Tax'],
-            'stock_movements' => ['description' => 'Stock movements', 'class' => 'StockMvtWS', 'forbidden_method' => ['PUT', 'POST', 'PATCH', 'DELETE']],
+            'stock_movements' => ['description' => 'Stock movements', 'class' => 'StockMvtWS'],
             'stock_movement_reasons' => ['description' => 'Stock movement reason', 'class' => 'StockMvtReason'],
             'warehouses' => ['description' => 'Warehouses', 'class' => 'Warehouse', 'forbidden_method' => ['DELETE']],
             'stocks' => ['description' => 'Stocks', 'class' => 'Stock', 'forbidden_method' => ['PUT', 'POST', 'PATCH', 'DELETE']],

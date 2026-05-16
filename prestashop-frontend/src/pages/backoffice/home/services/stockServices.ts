@@ -1,10 +1,14 @@
 // src/pages/backoffice/home/services/stockServices.ts
 import type { LanguageData } from "@/contexts/LanguageContext";
 import { stockAvailableSchema } from "@/schemas/stock-available";
+import { stockMovementReasonSchema } from "@/schemas/stock-movement-reason";
+import { stockMovementSchema } from "@/schemas/stock-movements";
 import { fetchFromPrestashopApi } from "@/utils/url";
 import { PrestaShopXMLConverter } from "@/utils/xml";
 import { assureArray } from "@/utils/xml";
 import { toast } from "sonner";
+
+const EMPLOYEE_ID_STOCK_MVT_REASON = 1; // Employee id 1 used
 
 export interface StockAvailable {
   id: number;
@@ -73,23 +77,25 @@ export async function fetchProductStock(
 export async function updateStockQuantity(
   stockId: number,
   oldQuantity: number,
-  newQuantity: number,
-  _language: LanguageData,
+  quantity: number,
+  language: LanguageData,
   isMovement: boolean,
-  _name: string = "Manual adjustment",
+  name: string = "Manual adjustment",
 ): Promise<void> {
   const converter = new PrestaShopXMLConverter(stockAvailableSchema, "");
 
-  let resultQuantity: number;
-
-  if (!isMovement) resultQuantity = newQuantity;
-  else resultQuantity = newQuantity + oldQuantity;
+  const languageIds = language.rawLanguages.map((lang) => lang.id);
 
   const stockData: Record<string, string> = {
     id: stockId.toString(),
     id_shop: "1",
-    quantity: resultQuantity.toString(),
+    quantity: quantity.toString(),
   };
+
+  let movementQuantity: number;
+
+  if (isMovement) movementQuantity = quantity;
+  else movementQuantity = quantity - oldQuantity;
 
   const xmlData = converter.convertRowToXML(stockData);
 
@@ -102,11 +108,69 @@ export async function updateStockQuantity(
         body: xmlData,
       },
     );
+
+    // Add stock_movements entry
+    const reasonConverter = new PrestaShopXMLConverter(
+      stockMovementReasonSchema,
+      "",
+    );
+
+    const sign = movementQuantity >= 0 ? "1" : "-1";
+
+    const names: Record<string, string> = {};
+    for (const langId of languageIds) 
+      names[`name;language_id=${langId}`] = name;
+
+    // Stock movement reason "Manual adjustment" first
+    const stockMovementReasonData: Record<string, string> = {
+      sign,
+      ...names,
+    };
+
+    // Create and get ID
+    const reasonXml = reasonConverter.convertRowToXML(stockMovementReasonData);
+
+    const reasonResponse = await fetchFromPrestashopApi<{
+      stock_movement_reason: {
+        id: number;
+      };
+    }>("/stock_movement_reasons", {
+      method: "POST",
+      headers: { "Content-Type": "application/xml" },
+      body: reasonXml,
+    });
+
+    const reasonId = reasonResponse.stock_movement_reason.id;
+
+    // Then create stock movement
+    const stockMovementData: Record<string, string> = {
+      id_currency: language.currency_id.toString(),
+      id_stock: stockId.toString(),
+      id_stock_mvt_reason: reasonId.toString(),
+      id_employee: EMPLOYEE_ID_STOCK_MVT_REASON.toString(),
+      physical_quantity: Math.abs(movementQuantity).toString(),
+      sign,
+      price_te: "0", // No price impact for stock adjustments
+      date_add: new Date().toISOString().slice(0, 19).replace("T", " "),
+    };
+
+    // Create stock movement XML
+    const movementConverter = new PrestaShopXMLConverter(
+      stockMovementSchema,
+      "",
+    );
+    const movementXml = movementConverter.convertRowToXML(stockMovementData);
+
+    await fetchFromPrestashopApi("/stock_movements", {
+      method: "POST",
+      headers: { "Content-Type": "application/xml" },
+      body: movementXml,
+    });
   } catch (error) {
     console.error("Error updating stock:", error);
     toast.error("Failed to update stock");
     throw error;
   }
 
-  toast.success(`Stock updated to ${newQuantity}`);
+  toast.success(`Stock updated to ${quantity}`);
 }
