@@ -13,7 +13,7 @@ import type {
   OrderHistoryXML,
   OrderInvoiceXML,
 } from "./types";
-import { PrestaShopXMLConverter } from "@/utils/xml";
+import { assureArray, PrestaShopXMLConverter } from "@/utils/xml";
 
 export interface ImportedRow {
   index: number;
@@ -771,13 +771,13 @@ export async function resetApi(
       | undefined;
   }>(`/${apiNamePlural}?limit=1000`, { method: "GET" });
 
-  if (!response[specialApiNamePlural])
+  if (!response[specialApiNamePlural] || !response[specialApiNamePlural][specialApiName]) 
     return {
       deletedApiIds,
       failedApiIds,
     };
 
-  for (const id of response[specialApiNamePlural][specialApiName]) {
+  for (const id of assureArray(response[specialApiNamePlural][specialApiName])) {
     try {
       await fetchFromPrestashopApi(`/${apiNamePlural}/${id["@_id"]}`, {
         method: "DELETE",

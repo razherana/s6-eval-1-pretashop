@@ -18,7 +18,7 @@ interface ImportConfigurationViewProps {
   setDecimalSeparator: (separator: string) => void;
   dateFormat: string;
   setDateFormat: (format: string) => void;
-  bigError: string;
+  bigError?: string;
   currentStep: number;
   isImporting: boolean;
   currentFileProgress: number;

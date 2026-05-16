@@ -6,7 +6,6 @@ const dataSchema: DataXmlApiSchema = {
     id_customer: {
       xmlTag: "id_customer",
       type: "simple",
-      attributes: { required: "true" },
     },
     id_country: {
       xmlTag: "id_country",

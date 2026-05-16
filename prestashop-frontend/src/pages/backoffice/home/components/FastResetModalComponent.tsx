@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, AlertTriangle, CheckCircle2, XCircle, Zap, Package, ShoppingCart, Users, FolderTree, Percent, Layers, Ruler, ClipboardList, CreditCard, History, FileText, Warehouse, Box, ClipboardCheck, Pin } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, XCircle, Zap, Package, ShoppingCart, Users, FolderTree, Percent, Layers, Ruler, ClipboardList, CreditCard, History, FileText, Box, ClipboardCheck, Pin } from "lucide-react";
 import { fetchProducts, fetchOrders, fetchCustomers, fetchCategories, fetchTaxes, fetchTaxRuleGroups, fetchTaxRules, fetchOrderPayments, fetchOrderHistories, fetchOrderInvoices, resetProducts, resetOrders, resetCustomers, resetCategories, resetTaxes, resetTaxRuleGroups, resetTaxRules, resetCarts, resetOrderPayments, resetOrderHistories, resetOrderInvoices, resetApi } from "../services";
 import { toast } from "sonner";
 
@@ -39,7 +39,6 @@ const STEPS = [
   { id: 'customers', label: 'Customers', icon: <Users className="h-4 w-4" /> },
   { id: 'products', label: 'Products', icon: <Package className="h-4 w-4" /> },
   { id: 'categories', label: 'Categories', icon: <FolderTree className="h-4 w-4" /> },
-  { id: 'warehouses', label: 'Warehouses', icon: <Warehouse className="h-4 w-4" /> },
   { id: 'stocks', label: 'Stocks', icon: <Box className="h-4 w-4" /> },
   { id: 'stock_movements', label: 'Stock Movements', icon: <ClipboardCheck className="h-4 w-4" /> },
   { id: 'addresses', label: 'Addresses', icon: <Pin className="h-4 w-4" /> },
@@ -205,41 +204,31 @@ export function FastResetModalComponent({ open, setOpen, onResetComplete }: Fast
         failed: categoryResult.failedCategoryIds.length
       });
 
-      // Step 12: Warehouses
+      // Step 12: Stocks
       setCurrentStepIndex(11);
       updateStep(11, { status: "running" });
-      const warehouseResult = await resetApi('warehouse', 'warehouses');
-      updateStep(11, {
-        status: warehouseResult.failedApiIds.length === 0 ? 'success' : 'failed',
-        deleted: warehouseResult.deletedApiIds.length,
-        failed: warehouseResult.failedApiIds.length
-      });
-
-      // Step 13: Stocks
-      setCurrentStepIndex(12);
-      updateStep(12, { status: "running" });
       const stockResult = await resetApi('stock', 'stocks');
-      updateStep(12, {
+      updateStep(11, {
         status: stockResult.failedApiIds.length === 0 ? 'success' : 'failed',
         deleted: stockResult.deletedApiIds.length,
         failed: stockResult.failedApiIds.length
       });
 
-      // Step 14: Stock movements reasons
-      setCurrentStepIndex(13);
-      updateStep(13, { status: "running" });
+      // Step 13: Stock movements reasons
+      setCurrentStepIndex(12);
+      updateStep(12, { status: "running" });
       const stockMovementReasonsResult = await resetApi('stock_movement_reason', 'stock_movement_reasons');
-      updateStep(13, {
+      updateStep(12, {
         status: stockMovementReasonsResult.failedApiIds.length === 0 ? 'success' : 'failed',
         deleted: stockMovementReasonsResult.deletedApiIds.length,
         failed: stockMovementReasonsResult.failedApiIds.length
       });
 
-      // Step 15: Addresses
-      setCurrentStepIndex(14);
-      updateStep(14, { status: "running" });
+      // Step 14: Addresses
+      setCurrentStepIndex(13);
+      updateStep(13, { status: "running" });
       const addressesResult = await resetApi('address', 'addresses');
-      updateStep(14, {
+      updateStep(13, {
         status: addressesResult.failedApiIds.length === 0 ? 'success' : 'failed',
         deleted: addressesResult.deletedApiIds.length,
         failed: addressesResult.failedApiIds.length
