@@ -59,8 +59,13 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({
         currencies: {
           currency: CurrencyReadXML;
         }
+      } = {
+        currencies: {
+          currency: {} as CurrencyReadXML,
+        },
       };
-      let rawCurrencies: CurrencyReadXML[];
+
+      let rawCurrencies: CurrencyReadXML[] = [];
 
       if (languageData && languageData.language) {
         const urlParams = new URLSearchParams({

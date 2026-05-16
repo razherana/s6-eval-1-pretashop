@@ -203,6 +203,7 @@ export interface CustomerReadXML {
   firstname: string;
   lastname: string;
   email: string;
+  is_guest: number;
 }
 
 export interface LanguageReadXML {

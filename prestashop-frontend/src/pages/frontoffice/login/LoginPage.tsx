@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { fetchFromPrestashopApi } from "@/utils/url";
 import type { CustomerReadXML } from "@/pages/backoffice/home/types";
+import { assureArray } from "@/utils/xml";
 
 interface CustomerAuthData {
   id: number;
@@ -25,6 +26,7 @@ interface CustomerAuthData {
   lastname: string;
   passwd: string;
   active: number;
+  is_guest: number;
 }
 
 interface CustomerListResponse {
@@ -67,11 +69,11 @@ export function LoginPage() {
         }
 
         // Ensure customers is an array
-        const customerList = Array.isArray(customersData) ? customersData : [customersData];
+        const customerList = assureArray(customersData);
 
         // Filter only active customers
         const activeCustomers = customerList.filter(
-          (c) => c.active === 1
+          (c) => c.active === 1 && c.is_guest === 0
         );
 
         const formattedCustomers: CustomerReadXML[] = activeCustomers.map((c) => ({
@@ -79,6 +81,7 @@ export function LoginPage() {
           firstname: c.firstname,
           lastname: c.lastname,
           email: c.email,
+          is_guest: c.is_guest,
         }));
 
         setCustomers(formattedCustomers);

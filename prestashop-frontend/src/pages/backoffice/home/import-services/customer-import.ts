@@ -86,6 +86,9 @@ async function createCustomer(
   lastName: string,
   email: string,
   password: string,
+  default_group_id: number = 3,
+  groups: number[] = USER_GROUP_ACCESS,
+  otherFields: Record<string, string> = {},
 ): Promise<number> {
   const converter = new PrestaShopXMLConverter(customerSchema, "");
 
@@ -98,8 +101,9 @@ async function createCustomer(
     active: "1",
     newsletter: "0",
     optin: "0",
-    id_default_group: "3",
-    groups: USER_GROUP_ACCESS.join(","),
+    id_default_group: default_group_id.toString(),
+    groups: groups.join(","),
+    ...otherFields,
   });
 
   console.log("Create Customer XML:", xmlData);
@@ -343,7 +347,7 @@ export async function createCart(
   items: Array<{ productId: number; combinationId?: number; quantity: number }>,
   customerId: number,
   addressId: number,
-  date_add_to_use?: string,
+  date_add_to_use: string,
 ): Promise<number> {
   const converter = new PrestaShopXMLConverter(cartSchema, "");
 
@@ -415,7 +419,7 @@ export async function createOrder(
   totalAmountWt: number,
   paymentMethod: string,
   languageData: LanguageData,
-  date_add_to_use?: string,
+  date_add_to_use: string,
   initialStateId: (typeof ORDER_STATES)[keyof typeof ORDER_STATES] = ORDER_STATES.AWAITING_CASH_ON_DELIVERY,
 ): Promise<OrderReadXML> {
   const converter = new PrestaShopXMLConverter(orderSchema, "");
@@ -534,7 +538,7 @@ export async function createOrder(
 export async function updateOrderState(
   orderId: number,
   orderStateId: number,
-  date_add?: string,
+  date_add: string,
   additional_data: Record<string, string> = {},
 ): Promise<OrderHistoryXML> {
   const converter = new PrestaShopXMLConverter(orderHistorySchema, "");
@@ -758,7 +762,7 @@ export async function processCompleteOrderFlow(
   orderId: number,
   orderReference: string,
   totalAmount: number,
-  date_add?: string,
+  date_add: string,
   deleteGeneratedPayments: boolean = true,
 ): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 300));
@@ -821,6 +825,24 @@ export async function importCustomersFromFile(
 
     console.log("Existing customers:", Object.keys(existingCustomers).length);
     console.log("Product references:", productReferences);
+
+    // Step 1.5: Create the guest customer if it doesn't exist (for orders without customer email)
+    const guestEmail =
+      import.meta.env.VITE_PRESTASHOP_API_GUEST_EMAIL || "guest@guest.com";
+    if (!existingCustomers[guestEmail]) {
+      const guestCustomerId = await createCustomer(
+        "Guest",
+        "User",
+        guestEmail,
+        "guestpassword",
+        1, // Default group for guests
+        [], // No additional groups
+        {
+          is_guest: "1",
+        }
+      );
+      existingCustomers[guestEmail] = guestCustomerId;
+    }
 
     // Step 2: Process each row
     const rows: ImportedRow[] = [];

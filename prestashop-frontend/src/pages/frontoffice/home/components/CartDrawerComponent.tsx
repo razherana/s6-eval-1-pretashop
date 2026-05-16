@@ -10,12 +10,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { ShoppingCart, Minus, Plus, Trash2, Save } from 'lucide-react';
+import { ShoppingCart, Minus, Plus, Trash2 } from 'lucide-react';
 import { API_QUERY } from '@/utils/url';
-import { useFrontofficeAuth } from '@/hooks/useFrontofficeAuth';
-import { useLanguage } from '@/utils/lang';
-import { toast } from 'sonner';
-import { saveCart } from '../services/cartService';
+import { Spinner } from '@/components/ui/spinner';
 
 export function CartDrawerComponent({
   setIsCheckoutOpen
@@ -31,23 +28,32 @@ export function CartDrawerComponent({
     totalPrice,
     isOpen,
     setIsOpen,
+    isLoadingCart
   } = useCart();
-
-  const { authData } = useFrontofficeAuth();
-  const { language } = useLanguage();
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <SheetTrigger asChild>
-        <Button variant="outline" size="icon" className="relative">
-          <ShoppingCart className="h-5 w-5" />
-          {totalItems > 0 && (
-            <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-white">
-              {totalItems}
-            </span>
-          )}
-        </Button>
-      </SheetTrigger>
+      {
+        isLoadingCart && (
+          <div className="flex h-64 items-center justify-center">
+            <div className="text-muted-foreground text-xs flex items-center">
+              <Spinner className="mr-2" />
+              Loading cart...</div>
+          </div>
+        )
+      }
+      {
+        !isLoadingCart && (<SheetTrigger asChild>
+          <Button variant="outline" size="icon" className="relative">
+            <ShoppingCart className="h-5 w-5" />
+            {totalItems > 0 && (
+              <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-white">
+                {totalItems}
+              </span>
+            )}
+          </Button>
+        </SheetTrigger>)
+      }
       <SheetContent className="flex w-full flex-col sm:max-w-lg">
         <SheetHeader>
           <SheetTitle className="flex items-center justify-between">
@@ -187,32 +193,6 @@ export function CartDrawerComponent({
               <div className="text-xs text-muted-foreground text-center">
                 <p>Free shipping • Payment on delivery</p>
               </div>
-
-              {/* Save Cart Button - only show for authenticated users */}
-              {authData.isAuthenticated && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  size="sm"
-                  onClick={async () => {
-                    setIsOpen(false);
-                    try {
-                      await saveCart(
-                        items,
-                        authData.user!.id,
-                        language?.currency_id || 1,
-                        language?.language_id || 1,
-                      );
-                      clearCart();
-                    } catch (error) {
-                      toast.error("Failed to save cart");
-                    }
-                  }}
-                >
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Cart for Later
-                </Button>
-              )}
 
               <Button
                 className="w-full"

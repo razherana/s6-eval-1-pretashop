@@ -2,9 +2,9 @@ import type { AssociationTransformFunction, DataXmlApiSchema, XmlApiSchema } fro
 
 const transforms : Record<string, AssociationTransformFunction> = {
   toGroupsByIds: (container, groupIds: string, _rowData, _schema) => {
-    const groupElement = container.ele("group");
     
     groupIds.split(",").map(id => ({ id: parseInt(id.trim()) })).forEach(group => {
+      const groupElement = container.ele("group");
       groupElement.ele("id").dat(group.id.toString());
     });
 
@@ -25,6 +25,14 @@ export const customerSchema: XmlApiSchema = {
         xmlTag: "id_lang",
         type: "simple",
         attributes: { required: "true" },
+      },
+      id_default_group: {
+        xmlTag: "id_default_group",
+        type: "simple",
+      },
+      is_guest: {
+        xmlTag: "is_guest",
+        type: "simple",
       },
       firstname: {
         xmlTag: "firstname",

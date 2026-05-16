@@ -12,11 +12,9 @@ import { cartToCartItems, type UserCart } from '../services/cartService';
 import { Loader2, CheckCircle, Package, User, UserPlus, ShoppingCart, Save } from 'lucide-react';
 import { SavedCartsComponent } from './SavedCartsComponent';
 import { toast } from 'sonner';
+import { FrontofficeDataLoadingComponent } from '@/components/ui-manual/frontofficedata-loading-state';
 
 interface CustomerFormData {
-  firstname: string;
-  lastname: string;
-  email: string;
   address: string;
   city: string;
   phone: string;
@@ -32,9 +30,6 @@ export function CheckoutFormComponent() {
   );
 
   const [formData, setFormData] = useState<CustomerFormData>({
-    firstname: authData.user?.firstname || '',
-    lastname: authData.user?.lastname || '',
-    email: authData.user?.email || '',
     address: '',
     city: '',
     phone: '',
@@ -70,7 +65,7 @@ export function CheckoutFormComponent() {
 
   const handleAddToCurrentCart = useCallback(async (cart: UserCart) => {
     setLoadingCartItems(true);
-    
+
     try {
       const cartItems = await cartToCartItems(cart);
       for (const item of cartItems) {
@@ -87,7 +82,7 @@ export function CheckoutFormComponent() {
     }
   }, [addToCart]);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     // Check for items based on checkout mode
@@ -96,13 +91,12 @@ export function CheckoutFormComponent() {
       return;
     }
 
-    const formDataToUse = { ...formData };
-
-    if (activeTab === 'account' && authData.user) {
-      formDataToUse.firstname = authData.user.firstname;
-      formDataToUse.lastname = authData.user.lastname;
-      formDataToUse.email = authData.user.email;
-    }
+    const formDataToUse = {
+      ...formData,
+      firstname: authData.user.firstname,
+      lastname: authData.user.lastname,
+      email: authData.user.email,
+    };
 
     if (!formDataToUse.address || !formDataToUse.city || !formDataToUse.phone) {
       toast.error('Please fill in all required fields');
@@ -112,7 +106,7 @@ export function CheckoutFormComponent() {
     setLoading(true);
 
     try {
-      const customerInfo: CustomerFormData = {
+      const customerInfo = {
         firstname: formDataToUse.firstname,
         lastname: formDataToUse.lastname,
         email: formDataToUse.email,
@@ -124,9 +118,9 @@ export function CheckoutFormComponent() {
       const result = await processCheckout(
         selectedCartId !== null ? [] : items, // Pass empty array if using saved cart
         customerInfo,
-        language?.language_id || 1,
-        language?.currency_id || 1,
-        activeTab === 'account' ? authData.user?.id : undefined,
+        language.language_id,
+        language.currency_id,
+        authData.user.id,
         selectedCartId || undefined, // Pass the selected cart ID if available
       );
 
@@ -150,6 +144,9 @@ export function CheckoutFormComponent() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
+
+  if (!authData.user) 
+    return <FrontofficeDataLoadingComponent />;
 
   if (orderSuccess) {
     return (
@@ -244,42 +241,9 @@ export function CheckoutFormComponent() {
         )}
 
         <TabsContent value="guest" className="space-y-4 mt-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstname">First Name *</Label>
-              <Input
-                id="firstname"
-                name="firstname"
-                value={formData.firstname}
-                onChange={handleInputChange}
-                required
-                placeholder="John"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastname">Last Name *</Label>
-              <Input
-                id="lastname"
-                name="lastname"
-                value={formData.lastname}
-                onChange={handleInputChange}
-                required
-                placeholder="Doe"
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email *</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              required
-              placeholder="john.doe@example.com"
-            />
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Guest checkout uses the default guest account.
+          </p>
         </TabsContent>
 
         <TabsContent value="account" className="space-y-4 mt-4">
@@ -306,36 +270,36 @@ export function CheckoutFormComponent() {
         <div className="space-y-4 mt-4">
           <div className="space-y-2">
             <Label htmlFor="phone">Phone *</Label>
-            <Input 
-              id="phone" 
-              name="phone" 
-              type="tel" 
-              value={formData.phone} 
-              onChange={handleInputChange} 
-              required 
-              placeholder="+261 34 12 345 67" 
+            <Input
+              id="phone"
+              name="phone"
+              type="tel"
+              value={formData.phone}
+              onChange={handleInputChange}
+              required
+              placeholder="+261 34 12 345 67"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="address">Address *</Label>
-            <Input 
-              id="address" 
-              name="address" 
-              value={formData.address} 
-              onChange={handleInputChange} 
-              required 
-              placeholder="123 Main Street" 
+            <Input
+              id="address"
+              name="address"
+              value={formData.address}
+              onChange={handleInputChange}
+              required
+              placeholder="123 Main Street"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="city">City *</Label>
-            <Input 
-              id="city" 
-              name="city" 
-              value={formData.city} 
-              onChange={handleInputChange} 
-              required 
-              placeholder="Antananarivo" 
+            <Input
+              id="city"
+              name="city"
+              value={formData.city}
+              onChange={handleInputChange}
+              required
+              placeholder="Antananarivo"
             />
           </div>
         </div>

@@ -1,4 +1,5 @@
-import { createContext } from 'react';
+// src/contexts/CartContext.tsx
+import { createContext } from "react";
 
 export interface CartItem {
   productId: number;
@@ -13,14 +14,19 @@ export interface CartItem {
 
 export interface CartContextType {
   items: CartItem[];
-  addToCart: (item: Omit<CartItem, 'quantity'>, quantity?: number) => void;
+  addToCart: (item: Omit<CartItem, "quantity">, quantity?: number) => void;
   removeFromCart: (productId: number, combinationId?: number) => void;
-  updateQuantity: (productId: number, combinationId: number | undefined, quantity: number) => void;
+  updateQuantity: (
+    productId: number,
+    combinationId: number | undefined,
+    quantity: number,
+  ) => void;
   clearCart: () => void;
   totalItems: number;
   totalPrice: number;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
+  isLoadingCart?: boolean;
 }
 
 export const CartContext = createContext<CartContextType | undefined>(undefined);
