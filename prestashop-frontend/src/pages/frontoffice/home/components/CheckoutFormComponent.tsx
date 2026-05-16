@@ -85,6 +85,9 @@ export function CheckoutFormComponent() {
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    if (!authData.user)
+      return;
+
     // Check for items based on checkout mode
     if (selectedCartId === null && items.length === 0) {
       toast.error('No items to checkout');
@@ -145,7 +148,7 @@ export function CheckoutFormComponent() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  if (!authData.user) 
+  if (!authData.user)
     return <FrontofficeDataLoadingComponent />;
 
   if (orderSuccess) {
