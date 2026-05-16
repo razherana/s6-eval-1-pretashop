@@ -1,10 +1,16 @@
 // src/pages/backoffice/dashboard/services.ts
 import { fetchFromPrestashopApi } from "@/utils/url";
 import { format, parseISO } from "date-fns";
-import type { OrderReadXML } from "@/pages/backoffice/home/types";
+import type {
+  LanguageField,
+  OrderReadXML,
+} from "@/pages/backoffice/home/types";
 import { ORDER_STATES } from "@/pages/backoffice/home/types";
 import { utc } from "@date-fns/utc";
 import { assureArray } from "@/utils/xml";
+import { fetchProducts } from "@/pages/backoffice/home/services";
+import { fetchProductCombinations } from "@/pages/frontoffice/home/services";
+import { fetchProductStock } from "@/pages/backoffice/home/services/stockServices";
 
 export interface DailyStats {
   date: string;
@@ -22,6 +28,24 @@ export interface DashboardData {
   bestDay: DailyStats | null;
 }
 
+export interface ProductStockRow {
+  productId: number;
+  productName: LanguageField;
+  productReference: string;
+  combinationId: number;
+  combinationReference: string;
+  stockId: number;
+  quantity: number;
+}
+
+export interface StockMovement {
+  id: number;
+  id_stock: number;
+  sign: number;
+  physical_quantity: number;
+  date_add: string;
+}
+
 // Fetch all orders sorted by date
 export async function fetchAllOrdersForDashboard(): Promise<OrderReadXML[]> {
   const query = new URLSearchParams({
@@ -32,7 +56,7 @@ export async function fetchAllOrdersForDashboard(): Promise<OrderReadXML[]> {
   try {
     const response = await fetchFromPrestashopApi<{
       orders: {
-        order?: OrderReadXML | OrderReadXML[];
+        order: OrderReadXML | OrderReadXML[];
       };
     }>(`/orders?${query.toString()}`, { method: "GET" });
 
@@ -118,8 +142,14 @@ export function calculateDashboardData(
     day.cumulativeAmount = runningTotal;
   }
 
-  const grandTotal = filteredStats.reduce((sum, day) => sum + day.totalAmount, 0);
-  const totalOrders = filteredStats.reduce((sum, day) => sum + day.orderCount, 0);
+  const grandTotal = filteredStats.reduce(
+    (sum, day) => sum + day.totalAmount,
+    0,
+  );
+  const totalOrders = filteredStats.reduce(
+    (sum, day) => sum + day.orderCount,
+    0,
+  );
   const averageOrderValue = totalOrders > 0 ? grandTotal / totalOrders : 0;
 
   const bestDay =
@@ -156,4 +186,77 @@ export function prepareChartData(dailyStats: DailyStats[]) {
     cumulative: Math.round(day.cumulativeAmount * 100) / 100,
     fullDate: day.date,
   }));
+}
+
+export async function fetchStockRowsForDashboard(): Promise<ProductStockRow[]> {
+  const products = await fetchProducts(1000, 0);
+  const productsWithCombinations = products.filter(
+    (product) => product.associations?.combinations?.combination?.length > 0,
+  );
+
+  const rows: ProductStockRow[] = [];
+
+  await Promise.all(
+    productsWithCombinations.map(async (product) => {
+      const [combinations, stockInfo] = await Promise.all([
+        fetchProductCombinations(product.id),
+        fetchProductStock(product.id),
+      ]);
+
+      for (const combination of combinations) {
+        const stock = stockInfo.stocks.get(combination.id);
+        if (stock)
+          rows.push({
+            productId: product.id,
+            productName: product.name,
+            productReference: product.reference || "",
+            combinationId: combination.id,
+            combinationReference: combination.reference || "",
+            stockId: stock.id,
+            quantity: stock.quantity,
+          });
+      }
+    }),
+  );
+
+  return rows.sort(
+    (a, b) => a.productId - b.productId || a.combinationId - b.combinationId,
+  );
+}
+
+export async function fetchStockMovements(
+  stockId: number,
+): Promise<StockMovement[]> {
+  const query = new URLSearchParams({
+    display: "full",
+    limit: "1000",
+    "filter[id_stock]": stockId.toString(),
+  });
+
+  try {
+    const response = await fetchFromPrestashopApi<{
+      stock_mvts: {
+        stock_mvt: {
+          id: number;
+          id_stock: { "#text": number };
+          sign: number;
+          physical_quantity: number;
+          date_add: string;
+        }[];
+      };
+    }>(`/stock_movements?${query.toString()}`, { method: "GET" });
+
+    const movements = assureArray(response.stock_mvts.stock_mvt);
+
+    return movements.map((movement) => ({
+      id: movement.id,
+      id_stock: movement.id_stock["#text"],
+      sign: movement.sign,
+      physical_quantity: movement.physical_quantity,
+      date_add: movement.date_add,
+    }));
+  } catch (error) {
+    console.error("Error fetching stock movements:", error);
+    return [];
+  }
 }

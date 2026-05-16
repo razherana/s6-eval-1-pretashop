@@ -81,15 +81,18 @@ export async function updateStockQuantity(
   language: LanguageData,
   isMovement: boolean,
   name: string = "Manual adjustment",
+  dateAdd: string = new Date().toISOString().slice(0, 19).replace("T", " "),
 ): Promise<void> {
   const converter = new PrestaShopXMLConverter(stockAvailableSchema, "");
 
   const languageIds = language.rawLanguages.map((lang) => lang.id);
 
+  const newQuantity = isMovement ? oldQuantity + quantity : quantity;
+
   const stockData: Record<string, string> = {
     id: stockId.toString(),
     id_shop: "1",
-    quantity: quantity.toString(),
+    quantity: newQuantity.toString(),
   };
 
   let movementQuantity: number;
@@ -118,7 +121,7 @@ export async function updateStockQuantity(
     const sign = movementQuantity >= 0 ? "1" : "-1";
 
     const names: Record<string, string> = {};
-    for (const langId of languageIds) 
+    for (const langId of languageIds)
       names[`name;language_id=${langId}`] = name;
 
     // Stock movement reason "Manual adjustment" first
@@ -151,7 +154,7 @@ export async function updateStockQuantity(
       physical_quantity: Math.abs(movementQuantity).toString(),
       sign,
       price_te: "0", // No price impact for stock adjustments
-      date_add: new Date().toISOString().slice(0, 19).replace("T", " "),
+      date_add: dateAdd,
     };
 
     // Create stock movement XML

@@ -59,6 +59,12 @@ interface CombinationOption {
   name: string;
 }
 
+const formatMovementDate = (value: string): string => {
+  if (!value) return new Date().toISOString().slice(0, 19).replace("T", " ");
+  const isoDate = value.length === 16 ? `${value}:00` : value;
+  return isoDate.replace("T", " ");
+};
+
 export function StockManagementModalComponent({
   open,
   setOpen,
@@ -74,6 +80,7 @@ export function StockManagementModalComponent({
   const [editStockId, setEditStockId] = useState<number | null>(null);
   const [editQuantity, setEditQuantity] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [movementDateTime, setMovementDateTime] = useState<string>("");
 
   // Is movement mode (set directly the quantity or make a movement)
   const [isMovement, setIsMovement] = useState(false);
@@ -153,6 +160,7 @@ export function StockManagementModalComponent({
         setSelectedCombinationId("");
         setEditStockId(null);
         setEditQuantity("");
+        setMovementDateTime("");
       }
     })();
   }, [open, product, loadStock, loadCombinations]);
@@ -160,6 +168,9 @@ export function StockManagementModalComponent({
   const handleEditStock = (stockId: number, currentQuantity: number) => {
     setEditStockId(stockId);
     setEditQuantity(currentQuantity.toString());
+    if (!movementDateTime) {
+      setMovementDateTime(new Date().toISOString().slice(0, 16));
+    }
   };
 
   const handleSaveStock = async () => {
@@ -178,10 +189,13 @@ export function StockManagementModalComponent({
         currentStock ? currentStock.quantity : 0,
         quantity,
         language,
-        isMovement
+        isMovement,
+        "Manual adjustment",
+        formatMovementDate(movementDateTime),
       );
       setEditStockId(null);
       setEditQuantity("");
+      setMovementDateTime("");
       await loadStock();
     } catch (error) {
       console.error("Error saving stock:", error);
@@ -340,6 +354,7 @@ export function StockManagementModalComponent({
                           if (e.key === "Escape") {
                             setEditStockId(null);
                             setEditQuantity("");
+                            setMovementDateTime("");
                           }
                         }}
                       />
@@ -360,10 +375,20 @@ export function StockManagementModalComponent({
                         onClick={() => {
                           setEditStockId(null);
                           setEditQuantity("");
+                          setMovementDateTime("");
                         }}
                       >
                         Cancel
                       </Button>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="movement-datetime">Movement date</Label>
+                      <Input
+                        id="movement-datetime"
+                        type="datetime-local"
+                        value={movementDateTime}
+                        onChange={(e) => setMovementDateTime(e.target.value)}
+                      />
                     </div>
                   </div>
                 ) : (
