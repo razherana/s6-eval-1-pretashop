@@ -14,6 +14,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { fetchFromPrestashopApi } from "@/utils/url";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const localCartKey = "localCartItems";
   const [items, setItems] = useState<CartItem[]>([]);
   const [cartId, setCartId] = useState<number | null>(() => {
     const saved = localStorage.getItem("cartId");
@@ -31,7 +32,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   // Load cart from database
   const loadCartFromDatabase = useCallback(async () => {
-    if (!authData?.isAuthenticated || !authData?.user) return;
+    if (
+      !authData?.isAuthenticated ||
+      !authData?.user ||
+      authData?.user?.is_guest === 1
+    ) {
+      return;
+    }
 
     try {
       setIsLoadingCart(true);
@@ -127,11 +134,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           !authData?.user ||
           authData?.user?.is_guest === 1
         ) {
-          // Guest or logged out - clear everything
-          setItems([]);
+          // Guest or logged out - use local storage only
+          const savedItems = localStorage.getItem(localCartKey);
+          const parsedItems = savedItems ? (JSON.parse(savedItems) as CartItem[]) : [];
+          setItems(parsedItems);
           setCartId(null);
           localStorage.removeItem("cartId");
-          previousItemsRef.current = "";
+          previousItemsRef.current = JSON.stringify(parsedItems);
           hasLoadedCartRef.current = false;
         } else {
           // Logged in - load their cart
@@ -140,6 +149,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
     })();
   }, [authData?.isAuthenticated, authData?.user, loadCartFromDatabase]);
+
+  // Persist cart to local storage for guests or unauthenticated users
+  useEffect(() => {
+    if (authData?.isAuthenticated && authData?.user?.is_guest !== 1) return;
+    localStorage.setItem(localCartKey, JSON.stringify(items));
+  }, [authData?.isAuthenticated, authData?.user?.is_guest, items]);
 
   // Sync cart to database (only when items change from user action)
   useEffect(() => {
