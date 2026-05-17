@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, AlertTriangle, CheckCircle2, XCircle, Zap, Package, ShoppingCart, Users, FolderTree, Percent, Layers, Ruler, ClipboardList, CreditCard, History, FileText, Box, ClipboardCheck, Pin } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, XCircle, Zap, Package, ShoppingCart, Users, FolderTree, Percent, Layers, Ruler, ClipboardList, CreditCard, History, FileText, Box, ClipboardCheck, Pin, Database } from "lucide-react";
 import { fetchProducts, fetchOrders, fetchCustomers, fetchCategories, fetchTaxes, fetchTaxRuleGroups, fetchTaxRules, fetchOrderPayments, fetchOrderHistories, fetchOrderInvoices, resetProducts, resetOrders, resetCustomers, resetCategories, resetTaxes, resetTaxRuleGroups, resetTaxRules, resetCarts, resetOrderPayments, resetOrderHistories, resetOrderInvoices, resetApi } from "../services";
 import { toast } from "sonner";
 
@@ -38,6 +38,7 @@ const STEPS = [
   { id: 'carts', label: 'Carts', icon: <ShoppingCart className="h-4 w-4" /> },
   { id: 'customers', label: 'Customers', icon: <Users className="h-4 w-4" /> },
   { id: 'products', label: 'Products', icon: <Package className="h-4 w-4" /> },
+  { id: 'stock_availables', label: 'Stock Availables', icon: <Database className="h-4 w-4" /> },
   { id: 'categories', label: 'Categories', icon: <FolderTree className="h-4 w-4" /> },
   { id: 'stocks', label: 'Stocks', icon: <Box className="h-4 w-4" /> },
   { id: 'stock_movements', label: 'Stock Movements', icon: <ClipboardCheck className="h-4 w-4" /> },
@@ -190,56 +191,66 @@ export function FastResetModalComponent({ open, setOpen, onResetComplete }: Fast
         failed: productResult.failedProductIds.length
       });
 
-      // Step 11: Categories (except id 1 and 2)
+      // Step 11: Stock Availables
       setCurrentStepIndex(10);
-      updateStep(10, { status: 'running' });
+      updateStep(10, { status: "running" });
+      const stockAvailablesResult = await resetApi('stock_available', 'stock_availables');
+      updateStep(10, {
+        status: stockAvailablesResult.failedApiIds.length === 0 ? 'success' : 'failed',
+        deleted: stockAvailablesResult.deletedApiIds.length,
+        failed: stockAvailablesResult.failedApiIds.length
+      });
+
+      // Step 12: Categories (except id 1 and 2)
+      setCurrentStepIndex(11);
+      updateStep(11, { status: 'running' });
       const categories = await fetchCategories(1000, 0);
       const categoryIds = categories
         .filter(c => c.id !== 1 && c.id !== 2)
         .map(c => c.id);
-      updateStep(10, { total: categoryIds.length });
+      updateStep(11, { total: categoryIds.length });
       const categoryResult = await resetCategories(categoryIds);
-      updateStep(10, {
+      updateStep(11, {
         status: categoryResult.failedCategoryIds.length === 0 ? 'success' : 'failed',
         deleted: categoryResult.deletedCategoryIds.length,
         failed: categoryResult.failedCategoryIds.length
       });
 
-      // Step 12: Stocks
-      setCurrentStepIndex(11);
-      updateStep(11, { status: "running" });
+      // Step 13: Stocks
+      setCurrentStepIndex(12);
+      updateStep(12, { status: "running" });
       const stockResult = await resetApi('stock', 'stocks');
-      updateStep(11, {
+      updateStep(12, {
         status: stockResult.failedApiIds.length === 0 ? 'success' : 'failed',
         deleted: stockResult.deletedApiIds.length,
         failed: stockResult.failedApiIds.length
       });
 
-      // Step 13: Stock movements
-      setCurrentStepIndex(12);
-      updateStep(12, { status: "running" });
-      const stockMovementReasonsResult = await resetApi('stock_movement', 'stock_movements', 'stock_mvt', 'stock_mvts');
-      updateStep(12, {
-        status: stockMovementReasonsResult.failedApiIds.length === 0 ? 'success' : 'failed',
-        deleted: stockMovementReasonsResult.deletedApiIds.length,
-        failed: stockMovementReasonsResult.failedApiIds.length
-      });
-
-      // Step 14: Addresses
+      // Step 14: Stock movements
       setCurrentStepIndex(13);
       updateStep(13, { status: "running" });
-      const addressesResult = await resetApi('address', 'addresses');
+      const stockMovementsResult = await resetApi('stock_movement', 'stock_movements', 'stock_mvt', 'stock_mvts');
       updateStep(13, {
+        status: stockMovementsResult.failedApiIds.length === 0 ? 'success' : 'failed',
+        deleted: stockMovementsResult.deletedApiIds.length,
+        failed: stockMovementsResult.failedApiIds.length
+      });
+
+      // Step 15: Addresses
+      setCurrentStepIndex(14);
+      updateStep(14, { status: "running" });
+      const addressesResult = await resetApi('address', 'addresses');
+      updateStep(14, {
         status: addressesResult.failedApiIds.length === 0 ? 'success' : 'failed',
         deleted: addressesResult.deletedApiIds.length,
         failed: addressesResult.failedApiIds.length
       });
 
-      // Step 15: Stock movements reasons
-      setCurrentStepIndex(14);
-      updateStep(14, { status: "running" });
+      // Step 16: Stock movements reasons
+      setCurrentStepIndex(15);
+      updateStep(15, { status: "running" });
       const stockMovementReasons = await resetApi('stock_movement_reason', 'stock_movement_reasons');
-      updateStep(14, {
+      updateStep(15, {
         status: stockMovementReasons.failedApiIds.length === 0 ? 'success' : 'failed',
         deleted: stockMovementReasons.deletedApiIds.length,
         failed: stockMovementReasons.failedApiIds.length
