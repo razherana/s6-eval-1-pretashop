@@ -13,6 +13,7 @@ import { orderSchema } from "@/schemas/order";
 import { addressSchema } from "@/schemas/address";
 import { orderHistorySchema } from "@/schemas/orderHistory";
 import { orderPaymentSchema } from "@/schemas/orderPayment";
+import { updateStockQuantity } from "../services/stockServices";
 import { toast } from "sonner";
 import {
   ORDER_STATES,
@@ -763,6 +764,7 @@ export async function processCompleteOrderFlow(
   orderReference: string,
   totalAmount: number,
   date_add: string,
+  languageData: LanguageData,
   deleteGeneratedPayments: boolean = true,
 ): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 300));
@@ -770,6 +772,9 @@ export async function processCompleteOrderFlow(
 
   await new Promise((resolve) => setTimeout(resolve, 300));
   await updateOrderState(orderId, ORDER_STATES.DELIVERED, date_add);
+
+  // Remove from stock
+  await removeStock(orderId, languageData, date_add);
 
   await new Promise((resolve) => setTimeout(resolve, 300));
   const orderPayment = await addOrderPayment(
@@ -839,7 +844,7 @@ export async function importCustomersFromFile(
         [], // No additional groups
         {
           is_guest: "1",
-        }
+        },
       );
       existingCustomers[guestEmail] = guestCustomerId;
     }
@@ -1104,6 +1109,7 @@ export async function importCustomersFromFile(
                     order.reference,
                     totalAmountWt,
                     date_add_str,
+                    languageData,
                   );
                   console.log(
                     `Order #${order.reference} completed with payment`,
@@ -1187,5 +1193,108 @@ export async function importCustomersFromFile(
           (error instanceof Error ? error.message : String(error)),
       })),
     };
+  }
+}
+// Decrease stock quantities for all products in an order
+async function removeStock(
+  orderId: number,
+  languageData: LanguageData,
+  dateAdd: string,
+): Promise<void> {
+  // 1. Fetch order details
+  const detailsResponse = await fetchFromPrestashopApi<{
+    order_details: {
+      order_detail?: Array<{
+        id: number;
+        product_id: { "#text": number };
+        product_attribute_id: { "#text": number };
+        product_quantity: number;
+      }>;
+    };
+  }>(
+    `/order_details?filter[id_order]=${orderId}&display=[id,product_id,product_attribute_id,product_quantity]`,
+    { method: "GET" },
+  );
+
+  const details = assureArray(
+    detailsResponse.order_details?.order_detail,
+  ) as Array<{
+    id: number;
+    product_id: { "#text": number };
+    product_attribute_id: { "#text": number };
+    product_quantity: number;
+  }>;
+
+  if (details.length === 0) {
+    console.log(
+      `No order details found for order ${orderId}, skipping stock removal`,
+    );
+    return;
+  }
+
+  // 2. For each product in the order, find and update stock
+  for (const detail of details) {
+    const productId = detail.product_id["#text"];
+    const attributeId = detail.product_attribute_id["#text"];
+    const orderQuantity = detail.product_quantity;
+
+    // Fetch stock_available for this product
+    const stockQuery = new URLSearchParams({
+      display: "[id,quantity]",
+      "filter[id_product]": productId.toString(),
+    });
+
+    // If there's a specific attribute, filter by it; otherwise get default stock
+    if (attributeId !== 0) {
+      stockQuery.append("filter[id_product_attribute]", attributeId.toString());
+    } else {
+      stockQuery.append("filter[id_product_attribute]", "0");
+    }
+
+    try {
+      const stockResponse = await fetchFromPrestashopApi<{
+        stock_availables: {
+          stock_available: Array<{
+            id: number;
+            quantity: number;
+          }>;
+        };
+      }>(`/stock_availables?${stockQuery.toString()}`, { method: "GET" });
+
+      const stocks = assureArray(
+        stockResponse.stock_availables.stock_available,
+      );
+
+      if (stocks.length === 0) {
+        console.warn(
+          `No stock record found for product ${productId} (attribute ${attributeId})`,
+        );
+        continue;
+      }
+
+      const stockRecord = stocks[0];
+      const stockId = stockRecord.id;
+      const oldQuantity = stockRecord.quantity;
+
+      // Use the shared updateStockQuantity to update stock and create a movement record
+      await updateStockQuantity(
+        stockId,
+        oldQuantity,
+        -orderQuantity, // negative because we're removing from stock
+        languageData,
+        true, // isMovement
+        "Order stock removal",
+        dateAdd,
+      );
+
+      console.log(
+        `Stock for product ${productId} (attribute ${attributeId}): ${oldQuantity} → ${oldQuantity - orderQuantity}`,
+      );
+    } catch (error) {
+      console.error(
+        `Error updating stock for product ${productId} (attribute ${attributeId}):`,
+        error,
+      );
+    }
   }
 }

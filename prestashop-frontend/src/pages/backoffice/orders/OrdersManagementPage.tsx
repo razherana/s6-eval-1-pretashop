@@ -73,6 +73,8 @@ import { toast } from "sonner";
 import type { OrderReadXML, OrderDetailReadXML, OrderStateXML } from "@/pages/backoffice/home/types";
 import { SelectLanguageCurrency } from "@/components/ui-manual/select-lang";
 import { updateOrderState } from "../home/import-services/customer-import";
+import { format } from "date-fns";
+import { utc } from "@date-fns/utc";
 
 export function OrdersManagementPage() {
   const navigate = useNavigate();
@@ -91,7 +93,7 @@ export function OrdersManagementPage() {
   const handleDeliverAndPay = async (order: OrderReadXML) => {
     setProcessingOrder(true);
     try {
-      await processDeliveryAndPayment(order);
+      await processDeliveryAndPayment(order, language);
 
       // Reload orders
       const ordersData = await fetchAllOrdersWithCarts(100);
@@ -178,7 +180,7 @@ export function OrdersManagementPage() {
 
     setUpdatingOrder(true);
     try {
-      await updateOrderState(selectedOrder.id, parseInt(selectedStateId));
+      await updateOrderState(selectedOrder.id, parseInt(selectedStateId), format(new Date(), "yyyy-MM-dd HH:mm:ss", { in: utc }),);
 
       // Reload orders
       const ordersData = await fetchAllOrdersWithCarts(100);

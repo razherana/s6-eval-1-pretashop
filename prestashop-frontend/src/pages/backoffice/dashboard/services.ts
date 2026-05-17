@@ -203,8 +203,8 @@ function buildCombinationName(
   productOptionValues: Map<number, ProductOptionValueDetail>,
   languageId: number,
 ): string {
-  const optionValues = combination.associations?.product_option_values
-    ?.product_option_value;
+  const optionValues =
+    combination.associations?.product_option_values?.product_option_value;
   if (!optionValues) return `Variant #${combination.id}`;
 
   const optionValuesArray = Array.isArray(optionValues)
@@ -218,11 +218,11 @@ function buildCombinationName(
       parts.push(`Option #${ov.id}`);
       continue;
     }
-    
+
     const optionGroup = productOptions.get(
       typeof detail.id_attribute_group === "object"
-      ? detail.id_attribute_group['#text']
-      : detail.id_attribute_group,
+        ? detail.id_attribute_group["#text"]
+        : detail.id_attribute_group,
     );
 
     if (optionGroup) {
@@ -238,9 +238,6 @@ function buildCombinationName(
 
 export async function fetchStockRowsForDashboard(): Promise<ProductStockRow[]> {
   const products = await fetchProducts(1000, 0);
-  const productsWithCombinations = products.filter(
-    (product) => product.associations?.combinations?.combination?.length > 0,
-  );
 
   // Fetch all product options and option values to build combination names
   const [allOptions, allOptionValues] = await Promise.all([
@@ -261,30 +258,46 @@ export async function fetchStockRowsForDashboard(): Promise<ProductStockRow[]> {
   const rows: ProductStockRow[] = [];
 
   await Promise.all(
-    productsWithCombinations.map(async (product) => {
-      const [combinations, stockInfo] = await Promise.all([
-        fetchProductCombinations(product.id),
-        fetchProductStock(product.id),
-      ]);
+    products.map(async (product) => {
+      const stockInfo = await fetchProductStock(product.id);
+      const combinations = product.associations?.combinations?.combination
+        ?.length
+        ? await fetchProductCombinations(product.id)
+        : [];
 
-      for (const combination of combinations) {
-        const stock = stockInfo.stocks.get(combination.id);
-        if (stock)
-          rows.push({
-            productId: product.id,
-            productName: product.name,
-            productReference: product.reference || "",
-            combinationId: combination.id,
-            combinationReference: combination.reference || "",
-            combinationName: buildCombinationName(
-              combination,
-              productOptionsMap,
-              optionValuesMap,
-              1,
-            ),
-            stockId: stock.id,
-            quantity: stock.quantity,
-          });
+      if (combinations.length > 0) {
+        // Products with combinations
+        for (const combination of combinations) {
+          const stock = stockInfo.stocks.get(combination.id);
+          if (stock)
+            rows.push({
+              productId: product.id,
+              productName: product.name,
+              productReference: product.reference || "",
+              combinationId: combination.id,
+              combinationReference: combination.reference || "",
+              combinationName: buildCombinationName(
+                combination,
+                productOptionsMap,
+                optionValuesMap,
+                1,
+              ),
+              stockId: stock.id,
+              quantity: stock.quantity,
+            });
+        }
+      } else if (stockInfo.defaultStock) {
+        // Simple products (no combinations)
+        rows.push({
+          productId: product.id,
+          productName: product.name,
+          productReference: product.reference || "",
+          combinationId: 0,
+          combinationReference: "",
+          combinationName: "-",
+          stockId: stockInfo.defaultStock.id,
+          quantity: stockInfo.defaultStock.quantity,
+        });
       }
     }),
   );

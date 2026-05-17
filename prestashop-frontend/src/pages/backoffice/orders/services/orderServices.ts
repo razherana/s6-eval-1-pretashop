@@ -9,6 +9,7 @@ import { processCompleteOrderFlow } from "../../home/import-services/customer-im
 import { assureArray } from "@/utils/xml";
 import { toast } from "sonner";
 import { getCartTotal } from "@/pages/frontoffice/home/services/orderService";
+import type { LanguageData } from "@/utils/lang";
 
 export interface UserCart {
   id: number;
@@ -36,11 +37,11 @@ export async function fetchAllCarts(): Promise<UserCart[]> {
   try {
     const response = await fetchFromPrestashopApi<{
       carts: {
-        cart?: UserCart | UserCart[];
+        cart: UserCart | UserCart[];
       };
     }>(`/carts?${query.toString()}`, { method: "GET" });
 
-    return assureArray(response.carts?.cart);
+    return assureArray(response.carts.cart);
   } catch (error) {
     console.error("Error fetching carts:", error);
     return [];
@@ -126,11 +127,11 @@ export async function fetchAllOrdersWithCarts(
   try {
     const response = await fetchFromPrestashopApi<{
       orders: {
-        order?: OrderReadXML | OrderReadXML[];
+        order: OrderReadXML | OrderReadXML[];
       };
     }>(`/orders?${query.toString()}`, { method: "GET" });
 
-    const orders = assureArray(response.orders?.order);
+    const orders = assureArray(response.orders.order);
 
     // Get carts without orders and convert them
     const cartsWithoutOrders = await getCartsWithoutOrders();
@@ -168,7 +169,7 @@ export async function fetchAllOrders(
   try {
     const response = await fetchFromPrestashopApi<{
       orders: {
-        order?: OrderReadXML | OrderReadXML[];
+        order: OrderReadXML | OrderReadXML[];
       };
     }>(`/orders?${query.toString()}`, { method: "GET" });
 
@@ -191,7 +192,7 @@ export async function fetchOrderDetailsById(
   try {
     const response = await fetchFromPrestashopApi<{
       order_details: {
-        order_detail?: OrderDetailReadXML | OrderDetailReadXML[];
+        order_detail: OrderDetailReadXML | OrderDetailReadXML[];
       };
     }>(`/order_details?${query.toString()}`, { method: "GET" });
 
@@ -209,9 +210,9 @@ export async function fetchCartDetails(
   try {
     const response = await fetchFromPrestashopApi<{
       cart: {
-        associations?: {
-          cart_rows?: {
-            cart_row?: Array<{
+        associations: {
+          cart_rows: {
+            cart_row: Array<{
               id_product: { "#text": number };
               id_product_attribute: { "#text": number };
               quantity: number;
@@ -221,7 +222,7 @@ export async function fetchCartDetails(
       };
     }>(`/carts/${cartId}?display=full`, { method: "GET" });
 
-    const rows = assureArray(response.cart?.associations?.cart_rows?.cart_row);
+    const rows = assureArray(response.cart.associations.cart_rows.cart_row);
     const details: OrderDetailReadXML[] = [];
 
     for (const row of rows) {
@@ -281,7 +282,7 @@ export async function fetchAllOrderStates(): Promise<OrderStateXML[]> {
   try {
     const response = await fetchFromPrestashopApi<{
       order_states: {
-        order_state?: OrderStateXML | OrderStateXML[];
+        order_state: OrderStateXML | OrderStateXML[];
       };
     }>(`/order_states?${query.toString()}`, { method: "GET" });
 
@@ -295,6 +296,7 @@ export async function fetchAllOrderStates(): Promise<OrderStateXML[]> {
 // Process delivery and payment for an order
 export async function processDeliveryAndPayment(
   order: OrderReadXML,
+  languageData: LanguageData,
 ): Promise<void> {
   // Don't allow processing carts
   if (order.reference?.startsWith("CART-")) {
@@ -307,6 +309,7 @@ export async function processDeliveryAndPayment(
     order.reference,
     order.total_paid_tax_incl,
     new Date().toISOString().slice(0, 19).replace("T", " "),
-    true,
+    languageData,
+    true
   );
 }
