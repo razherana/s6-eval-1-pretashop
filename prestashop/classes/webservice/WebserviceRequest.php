@@ -337,7 +337,7 @@ class WebserviceRequestCore
             'stock_movement_reasons' => ['description' => 'Stock movement reason', 'class' => 'StockMvtReason'],
             'warehouses' => ['description' => 'Warehouses', 'class' => 'Warehouse', 'forbidden_method' => ['DELETE']],
             'stocks' => ['description' => 'Stocks', 'class' => 'Stock', 'forbidden_method' => ['PUT', 'POST', 'PATCH', 'DELETE']],
-            'stock_availables' => ['description' => 'Available quantities', 'class' => 'StockAvailable', 'forbidden_method' => ['POST', 'DELETE']],
+            'stock_availables' => ['description' => 'Available quantities', 'class' => 'StockAvailable', 'forbidden_method' => ['POST']],
             'warehouse_product_locations' => ['description' => 'Location of products in warehouses', 'class' => 'WarehouseProductLocation', 'forbidden_method' => ['PUT', 'POST', 'PATCH', 'DELETE']],
             'supply_orders' => ['description' => 'Supply Orders', 'class' => 'SupplyOrder', 'forbidden_method' => ['PUT', 'POST', 'PATCH', 'DELETE']],
             'supply_order_details' => ['description' => 'Supply Order Details', 'class' => 'SupplyOrderDetail', 'forbidden_method' => ['PUT', 'POST', 'PATCH', 'DELETE']],

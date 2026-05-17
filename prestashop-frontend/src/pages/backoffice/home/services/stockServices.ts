@@ -6,6 +6,8 @@ import { stockMovementSchema } from "@/schemas/stock-movements";
 import { fetchFromPrestashopApi } from "@/utils/url";
 import { PrestaShopXMLConverter } from "@/utils/xml";
 import { assureArray } from "@/utils/xml";
+import { utc } from "@date-fns/utc/utc";
+import { parseISO } from "date-fns";
 import { toast } from "sonner";
 
 const EMPLOYEE_ID_STOCK_MVT_REASON = 1; // Employee id 1 used
@@ -203,4 +205,65 @@ export async function updateStockQuantity(
   }
 
   toast.success(`Stock updated to ${quantity}`);
+}
+
+// Fetch stock quantity as it was at a given date (or current if no date provided)
+// Uses stock movements after the target date to reverse-calculate historical stock.
+export async function fetchStockAtDate(
+  stockId: number,
+  currentQuantity: number,
+  dateMax: string | null,
+): Promise<number> {
+  if (!dateMax) return currentQuantity;
+
+  // Fetch all movements after the target date
+  const query = new URLSearchParams({
+    display: "[id,sign,physical_quantity,date_add]",
+    "filter[id_stock]": stockId.toString(),
+    limit: "1000",
+  });
+
+  try {
+    const response = await fetchFromPrestashopApi<{
+      stock_mvts: {
+        stock_mvt?: Array<{
+          id: number;
+          sign: number;
+          physical_quantity: number;
+          date_add: string;
+        }>;
+      };
+    }>(`/stock_movements?${query.toString()}`, { method: "GET" });
+
+    const movements = assureArray(response.stock_mvts?.stock_mvt) as Array<{
+      id: number;
+      sign: number;
+      physical_quantity: number;
+      date_add: string;
+    }>;
+
+    // Filter manually
+    const filtered = movements.filter((m) => parseISO(m.date_add, { in: utc }) >= parseISO(dateMax, { in: utc }));
+
+    // Sort by date ascending
+    const sorted = filtered.sort((a, b) =>
+      a.date_add.localeCompare(b.date_add),
+    );
+
+    // Each movement's net effect: sign * physical_quantity
+    // Stock at dateMax = currentStock - sum(movements after dateMax)
+    let sumAfter = 0;
+    for (const m of sorted) {
+      sumAfter += m.sign * m.physical_quantity;
+    }
+
+    const historicalQuantity = Math.max(0, currentQuantity - sumAfter);
+    return historicalQuantity;
+  } catch (error) {
+    console.error(
+      `Error fetching stock movements for stock ${stockId}:`,
+      error,
+    );
+    return currentQuantity;
+  }
 }

@@ -18,7 +18,7 @@ import {
   fetchAllProductOptions,
   fetchAllProductOptionValues,
 } from "@/pages/frontoffice/home/services";
-import { fetchProductStock } from "@/pages/backoffice/home/services/stockServices";
+import { fetchProductStock, fetchStockAtDate } from "@/pages/backoffice/home/services/stockServices";
 
 export interface DailyStats {
   date: string;
@@ -131,7 +131,7 @@ export function calculateDashboardData(
   // Filter only paid orders
   const paidOrders = orders.filter((order) => {
     const stateId = order.current_state["#text"];
-    return stateId === ORDER_STATES.PAYMENT_ACCEPTED;
+    return stateId === ORDER_STATES.DELIVERED;
   });
 
   // Build all daily stats first (no date filter)
@@ -181,7 +181,7 @@ export function calculateDashboardData(
 export function getAllDailyStats(orders: OrderReadXML[]): DailyStats[] {
   const paidOrders = orders.filter((order) => {
     const stateId = order.current_state["#text"];
-    return stateId === ORDER_STATES.PAYMENT_ACCEPTED;
+    return stateId === ORDER_STATES.DELIVERED;
   });
 
   return buildDailyStats(paidOrders);
@@ -236,7 +236,9 @@ function buildCombinationName(
   return parts.join("\n");
 }
 
-export async function fetchStockRowsForDashboard(): Promise<ProductStockRow[]> {
+export async function fetchStockRowsForDashboard(
+  dateMax: string | null = null,
+): Promise<ProductStockRow[]> {
   const products = await fetchProducts(1000, 0);
 
   // Fetch all product options and option values to build combination names
@@ -269,7 +271,12 @@ export async function fetchStockRowsForDashboard(): Promise<ProductStockRow[]> {
         // Products with combinations
         for (const combination of combinations) {
           const stock = stockInfo.stocks.get(combination.id);
-          if (stock)
+          if (stock) {
+            const historicalQty = await fetchStockAtDate(
+              stock.id,
+              stock.quantity,
+              dateMax,
+            );
             rows.push({
               productId: product.id,
               productName: product.name,
@@ -283,11 +290,18 @@ export async function fetchStockRowsForDashboard(): Promise<ProductStockRow[]> {
                 1,
               ),
               stockId: stock.id,
-              quantity: stock.quantity,
+              quantity: historicalQty,
             });
+          }
         }
       } else if (stockInfo.defaultStock) {
         // Simple products (no combinations)
+        const stock = stockInfo.defaultStock;
+        const historicalQty = await fetchStockAtDate(
+          stock.id,
+          stock.quantity,
+          dateMax,
+        );
         rows.push({
           productId: product.id,
           productName: product.name,
@@ -295,8 +309,8 @@ export async function fetchStockRowsForDashboard(): Promise<ProductStockRow[]> {
           combinationId: 0,
           combinationReference: "",
           combinationName: "-",
-          stockId: stockInfo.defaultStock.id,
-          quantity: stockInfo.defaultStock.quantity,
+          stockId: stock.id,
+          quantity: historicalQty,
         });
       }
     }),

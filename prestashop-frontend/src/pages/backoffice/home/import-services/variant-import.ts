@@ -469,8 +469,9 @@ async function updateStockAvailable(
     0,
     parseInt(quantity),
     language,
-    false,
+    true,
     "Initial stock import",
+    "2020-01-01 00:00:00"
   );
 }
 

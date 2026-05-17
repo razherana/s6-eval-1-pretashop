@@ -767,12 +767,6 @@ export async function processCompleteOrderFlow(
   languageData: LanguageData,
   deleteGeneratedPayments: boolean = true,
 ): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  await updateOrderState(orderId, ORDER_STATES.SHIPPED, date_add);
-
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  await updateOrderState(orderId, ORDER_STATES.DELIVERED, date_add);
-
   // Remove from stock
   await removeStock(orderId, languageData, date_add);
 
@@ -809,6 +803,12 @@ export async function processCompleteOrderFlow(
           method: "DELETE",
         });
   }
+
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  await updateOrderState(orderId, ORDER_STATES.SHIPPED, date_add);
+
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  await updateOrderState(orderId, ORDER_STATES.DELIVERED, date_add);
 }
 
 // Main import function
@@ -1059,7 +1059,7 @@ export async function importCustomersFromFile(
                 date_add_str,
               );
 
-              if (etat === "") {
+              if (etat === "" || etat === "dans le panier") {
                 // If no status then we don't create an order but keep it as a cart
                 rows.push({
                   index: index + 1,

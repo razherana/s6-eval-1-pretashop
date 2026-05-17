@@ -87,31 +87,17 @@ export function DashboardPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    setStockLoading(true);
     setError(null);
-    setStockError(null);
 
-    const [ordersResult, stockResult] = await Promise.allSettled([
-      fetchAllOrdersForDashboard(),
-      fetchStockRowsForDashboard(),
-    ]);
-
-    if (ordersResult.status === "fulfilled") {
-      setOrders(ordersResult.value);
-    } else {
-      console.error("Error loading dashboard data:", ordersResult.reason);
+    try {
+      const ordersResult = await fetchAllOrdersForDashboard();
+      setOrders(ordersResult);
+    } catch (err) {
+      console.error("Error loading dashboard data:", err);
       setError("Failed to load dashboard data");
+    } finally {
+      setLoading(false);
     }
-
-    if (stockResult.status === "fulfilled") {
-      setStockRows(stockResult.value);
-    } else {
-      console.error("Error loading stock data:", stockResult.reason);
-      setStockError("Failed to load stock data");
-    }
-
-    setLoading(false);
-    setStockLoading(false);
   }, []);
 
   useEffect(() => {
@@ -152,6 +138,26 @@ export function DashboardPage() {
       }
     })();
   }, [isStockHistoryOpen, selectedStockRow?.stockId]);
+
+  // Re-fetch stock rows when the selected date changes
+  useEffect(() => {
+    (async () => {
+      setStockLoading(true);
+      try {
+        const dateStr = selectedDate
+          ? format(selectedDate, "yyyy-MM-dd", { in: utc })
+          : null;
+        const rows = await fetchStockRowsForDashboard(dateStr);
+        setStockRows(rows);
+        setStockError(null);
+      } catch (err) {
+        console.error("Error loading stock data:", err);
+        setStockError("Failed to load stock data");
+      } finally {
+        setStockLoading(false);
+      }
+    })();
+  }, [selectedDate]);
 
   if (!language) {
     return <LanguageLoadingComponent />;
@@ -465,7 +471,11 @@ export function DashboardPage() {
                 type="date"
                 className="w-40"
                 value={selectedDate ? format(selectedDate, "yyyy-MM-dd", { in: utc }) : ""}
-                readOnly
+                onChange={(e) =>
+                  setSelectedDate(
+                    e.target.value ? parseISO(`${e.target.value}`, { in: utc }) : null,
+                  )
+                }
               />
             </div>
           </CardHeader>
