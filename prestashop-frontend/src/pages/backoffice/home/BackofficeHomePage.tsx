@@ -37,12 +37,6 @@ export function BackofficeHomePage() {
   const [selectedProductForStock, setSelectedProductForStock] = useState<ProductReadXML | null>(null);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
 
-  const normalizeImages = (images: {
-    id: number;
-  } | [{ id: number; }]) => {
-    return Array.isArray(images) ? images : images ? [images] : [];
-  };
-
   useEffect(() => {
     async function loadProducts() {
       try {
@@ -253,7 +247,7 @@ export function BackofficeHomePage() {
                       Stock
                     </Button>
                     {(() => {
-                      const normalizedImages = normalizeImages(product.associations.images.image);
+                      const normalizedImages = assureArray(product.associations.images.image);
                       return normalizedImages.length > 1 && (
                         <Badge variant="outline" className="text-xs">
                           +{normalizedImages.length - 1} images
