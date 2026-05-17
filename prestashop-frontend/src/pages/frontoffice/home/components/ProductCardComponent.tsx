@@ -1,5 +1,5 @@
 // src/pages/frontoffice/home/components/ProductCardComponent.tsx
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,7 @@ import { getWithLanguage, getFormattedPrice } from '@/utils/lang';
 import { ProductCombinationSelectComponent } from './ProductCombinationSelectComponent';
 import type { ProductReadXML } from '@/pages/backoffice/home/types';
 import { API_QUERY } from '@/utils/url';
+import { fetchProductStock } from '@/pages/backoffice/home/services/stockServices';
 
 interface CombinationOption {
   id: number;
@@ -35,11 +36,11 @@ function getProductBadge(availableDate: string): { type: 'hot' | 'new' | null; l
 
   const now = new Date();
   now.setHours(0, 0, 0, 0); // Start of today
-  
+
   const today = new Date(now);
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
-  
+
   const oneWeekAgo = new Date(now);
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
@@ -76,7 +77,51 @@ export function ProductCardComponent({
   const [currentPrice, setCurrentPrice] = useState(
     product.price_ttc || product.price,
   );
+  const [stockMap, setStockMap] = useState<Map<number, number>>(new Map());
+  const [stockLoading, setStockLoading] = useState(true);
   const { addToCart } = useCart();
+
+  // Fetch stock data for this product
+  useEffect(() => {
+    (async () => {
+      try {
+        setStockLoading(true);
+        const stockInfo = await fetchProductStock(product.id);
+        const map = new Map<number, number>();
+
+        // Default stock (combinationId = 0)
+        if (stockInfo.defaultStock) {
+          map.set(0, stockInfo.defaultStock.quantity);
+        }
+
+        // Combination stocks
+        for (const [combId, stock] of stockInfo.stocks) {
+          map.set(combId, stock.quantity);
+        }
+
+        setStockMap(map);
+      } catch (err) {
+        console.error(`Error fetching stock for product ${product.id}:`, err);
+      } finally {
+        setStockLoading(false);
+      }
+    })();
+  }, [product.id]);
+
+  // Get current stock quantity for display
+  const currentStock = selectedCombination
+    ? stockMap.get(selectedCombination.id) ?? 0
+    : stockMap.get(0) ?? 0;
+
+  const getStockBadge = (stockQty: number) => {
+    if (stockQty <= 0) {
+      return { label: 'Out of stock', color: 'bg-red-100 text-red-700 border-red-200', dot: 'bg-red-500' };
+    }
+    if (stockQty <= 5) {
+      return { label: `Only ${stockQty} left`, color: 'bg-amber-100 text-amber-700 border-amber-200', dot: 'bg-amber-500' };
+    }
+    return { label: 'In stock', color: 'bg-green-100 text-green-700 border-green-200', dot: 'bg-green-500' };
+  };
 
   const imagesData = product.associations?.images?.image;
   const images = Array.isArray(imagesData)
@@ -147,17 +192,17 @@ export function ProductCardComponent({
   // Get display text for selected variant
   const getVariantDisplay = () => {
     if (!selectedCombination) return null;
-    
+
     if (selectedCombination.attributesByGroup.size > 0) {
       return Array.from(selectedCombination.attributesByGroup.entries())
         .map(([group, value]) => `${group}: ${value}`)
         .join(', ');
     }
-    
+
     if (selectedCombination.attributeNames.length > 0) {
       return selectedCombination.attributeNames.join(', ');
     }
-    
+
     return null;
   };
 
@@ -186,11 +231,10 @@ export function ProductCardComponent({
           {productBadge.type && (
             <div className="absolute left-2 top-2 z-10">
               <Badge
-                className={`flex items-center gap-1 px-2 py-1 text-xs font-bold ${
-                  productBadge.type === 'hot'
-                    ? 'bg-red-500 text-white hover:bg-red-600'
-                    : 'bg-blue-500 text-white hover:bg-blue-600'
-                }`}
+                className={`flex items-center gap-1 px-2 py-1 text-xs font-bold ${productBadge.type === 'hot'
+                  ? 'bg-red-500 text-white hover:bg-red-600'
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
               >
                 {productBadge.type === 'hot' ? (
                   <Flame className="h-3 w-3" />
@@ -232,11 +276,10 @@ export function ProductCardComponent({
                     e.stopPropagation();
                     setCurrentImageIndex(idx);
                   }}
-                  className={`h-2 w-2 rounded-full transition-all ${
-                    idx === currentImageIndex
-                      ? 'bg-white scale-110'
-                      : 'bg-white/50 hover:bg-white/75'
-                  }`}
+                  className={`h-2 w-2 rounded-full transition-all ${idx === currentImageIndex
+                    ? 'bg-white scale-110'
+                    : 'bg-white/50 hover:bg-white/75'
+                    }`}
                   aria-label={`View image ${idx + 1}`}
                 />
               ))}
@@ -255,9 +298,8 @@ export function ProductCardComponent({
             }
           >
             <Heart
-              className={`h-4 w-4 transition-colors ${
-                isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-600'
-              }`}
+              className={`h-4 w-4 transition-colors ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-600'
+                }`}
             />
           </button>
 
@@ -267,12 +309,14 @@ export function ProductCardComponent({
               <Button
                 onClick={handleAddToCart}
                 className="w-full rounded-none bg-primary/90 hover:bg-primary"
-                disabled={hasCombinations && !selectedCombination}
+                disabled={hasCombinations && !selectedCombination || (!stockLoading && currentStock <= 0)}
               >
                 <ShoppingCart className="mr-2 h-4 w-4" />
                 {hasCombinations && !selectedCombination
                   ? 'Select variant first'
-                  : 'Add to Cart'}
+                  : (!stockLoading && currentStock <= 0)
+                    ? 'Out of stock'
+                    : 'Add to Cart'}
               </Button>
             </div>
           )}
@@ -298,6 +342,7 @@ export function ProductCardComponent({
               productId={product.id}
               basePrice={product.price_ttc || product.price}
               onSelect={handleCombinationSelect}
+              stockMap={stockMap}
             />
           )}
 
@@ -312,25 +357,45 @@ export function ProductCardComponent({
                 </p>
               )}
             </div>
-            {product.id_tax_rules_group !== undefined &&
-              product.id_tax_rules_group !== '' && (
-                <Badge variant="secondary" className="text-xs">
-                  Tax included
-                </Badge>
-              )}
+            <div className="flex items-center gap-1.5">
+              {product.id_tax_rules_group !== undefined &&
+                product.id_tax_rules_group !== '' && (
+                  <Badge variant="secondary" className="text-xs">
+                    Tax included
+                  </Badge>
+                )}
+            </div>
           </div>
+
+          {/* Stock Status */}
+          {!stockLoading && (
+            <div className="pt-1">
+              <Badge
+                variant="outline"
+                className={`flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-medium ${getStockBadge(currentStock).color}`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${getStockBadge(currentStock).dot}`} />
+                {`${getStockBadge(currentStock).label} - ${
+                  // If with combinations and selectedCombination null, precise stock is total
+                  hasCombinations && !selectedCombination ? `Total: ${currentStock}` : `Quantity: ${currentStock}`
+                  }`}
+              </Badge>
+            </div>
+          )}
 
           {/* Mobile Add to Cart Button */}
           <div className="md:hidden pt-2">
             <Button
               onClick={handleAddToCart}
               className="w-full"
-              disabled={hasCombinations && !selectedCombination}
+              disabled={hasCombinations && !selectedCombination || (!stockLoading && currentStock <= 0)}
             >
               <ShoppingCart className="mr-2 h-4 w-4" />
               {hasCombinations && !selectedCombination
                 ? 'Select variant first'
-                : 'Add to Cart'}
+                : (!stockLoading && currentStock <= 0)
+                  ? 'Out of stock'
+                  : 'Add to Cart'}
             </Button>
           </div>
         </div>

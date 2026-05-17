@@ -235,7 +235,7 @@ export function DashboardPage() {
                 id="date-filter"
                 type="date"
                 className="w-48"
-                value={selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}
+                value={selectedDate ? format(selectedDate, "yyyy-MM-dd", { in: utc }) : ""}
                 onChange={(e) =>
                   setSelectedDate(
                     e.target.value ? parseISO(`${e.target.value}`, { in: utc }) : null,
@@ -256,7 +256,7 @@ export function DashboardPage() {
           {selectedDate && (
             <p className="text-sm text-muted-foreground mt-2">
               Charts & stats show cumulative data up to{" "}
-              {format(selectedDate, "dd MMMM yyyy", { locale: fr })}
+              {format(selectedDate, "dd MMMM yyyy", { locale: fr, in: utc })}.
             </p>
           )}
         </div>

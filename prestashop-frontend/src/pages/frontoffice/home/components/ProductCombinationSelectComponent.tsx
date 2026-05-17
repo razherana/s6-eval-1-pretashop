@@ -29,12 +29,14 @@ interface ProductCombinationSelectProps {
   productId: number;
   basePrice: number;
   onSelect: (combination: CombinationOption | null, price: number) => void;
+  stockMap?: Map<number, number>;
 }
 
 export function ProductCombinationSelectComponent({
   productId,
   basePrice,
   onSelect,
+  stockMap,
 }: ProductCombinationSelectProps) {
   const { data } = useFrontofficeData();
   const { language } = useLanguage();
@@ -182,6 +184,18 @@ export function ProductCombinationSelectComponent({
     }
   };
 
+  const getCombinationStockBadge = (combId: number) => {
+    if (!stockMap) return null;
+    const qty = stockMap.get(combId) ?? 0;
+    if (qty <= 0) {
+      return { label: 'Out of stock', className: 'text-red-600 bg-red-50 border-red-200' };
+    }
+    if (qty <= 5) {
+      return { label: `Only ${qty} left`, className: 'text-amber-600 bg-amber-50 border-amber-200' };
+    }
+    return { label: `${qty} in stock`, className: 'text-green-600 bg-green-50 border-green-200' };
+  };
+
   if (loading) {
     return <div className="h-10 w-full bg-muted animate-pulse rounded-md" />;
   }
@@ -212,6 +226,7 @@ export function ProductCombinationSelectComponent({
             }
 
             const badge = getCombinationBadge(combination.availableDate);
+            const stockBadge = getCombinationStockBadge(combination.id);
 
             return (
               <SelectItem
@@ -229,6 +244,13 @@ export function ProductCombinationSelectComponent({
                           }`}
                       >
                         {badge.label}
+                      </span>
+                    )}
+                    {stockBadge && (
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium border ${stockBadge.className}`}
+                      >
+                        {stockBadge.label}
                       </span>
                     )}
                   </div>
