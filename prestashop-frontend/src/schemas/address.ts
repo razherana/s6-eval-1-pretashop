@@ -52,6 +52,10 @@ const dataSchema: DataXmlApiSchema = {
       type: "simple",
       attributes: {},
     },
+    date_add: {
+      xmlTag: "date_add",
+      type: "simple",
+    },
   },
   multiLangFields: {},
   associations: {},

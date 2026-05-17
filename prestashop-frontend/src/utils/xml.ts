@@ -402,7 +402,9 @@ export class PrestaShopXMLConverter {
  * @param item
  * @returns
  */
-export function assureArray<T>(item: T | T[]): T[] {
+export function assureArray<T>(item: MaybeArray<T>): T[] {
   if (item === null || item === undefined) return [];
   return Array.isArray(item) ? item : [item];
 }
+
+export type MaybeArray<T> = T | T[];

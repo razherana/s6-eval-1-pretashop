@@ -1,5 +1,5 @@
 import { fetchFromPrestashopApi } from "@/utils/url";
-import { PrestaShopXMLConverter } from "@/utils/xml";
+import { assureArray, PrestaShopXMLConverter, type MaybeArray } from "@/utils/xml";
 import {
   type ImportResult,
   type ImportedRow,
@@ -18,6 +18,7 @@ import type { TaxReadXML } from "../types";
 import { parse } from "date-fns";
 import { utc } from "@date-fns/utc";
 import { updateStockQuantity } from "../services/stockServices";
+import { setCombinationPrice } from "./combinationPriceCache";
 import type { LanguageData } from "@/utils/lang";
 
 interface ProductReferenceMap {
@@ -110,7 +111,7 @@ async function fetchAllProducts(): Promise<ProductReferenceMap> {
   try {
     const response = await fetchFromPrestashopApi<{
       products: {
-        product: Array<{
+        product: MaybeArray<{
           id: string;
           reference: string;
           id_tax_rules_group: string;
@@ -121,9 +122,7 @@ async function fetchAllProducts(): Promise<ProductReferenceMap> {
       method: "GET",
     });
 
-    const products = Array.isArray(response.products.product)
-      ? response.products.product
-      : [response.products.product];
+    const products = assureArray(response.products?.product);
 
     const map: ProductReferenceMap = {};
     for (const product of products) {
@@ -144,10 +143,10 @@ async function fetchStockAvailablesForProduct(
   try {
     const response = await fetchFromPrestashopApi<{
       stock_availables: {
-        stock_available: Array<{
-          id: string;
-          id_product: string | { "#text": string };
-          id_product_attribute: string | { "#text": string };
+        stock_available: MaybeArray<{
+          id: number;
+          id_product: number | { "#text": number };
+          id_product_attribute: number | { "#text": number };
         }>;
       };
     }>(`/stock_availables?display=full&filter[id_product]=${productId}`, {
@@ -155,17 +154,15 @@ async function fetchStockAvailablesForProduct(
     });
 
     const stockAvailables = response.stock_availables.stock_available;
-    const stockArray = Array.isArray(stockAvailables)
-      ? stockAvailables
-      : [stockAvailables];
+    const stockArray = assureArray(stockAvailables);
 
     const map: { [combinationId: number]: number } = {};
     for (const stock of stockArray) {
       const combinationId =
         typeof stock.id_product_attribute === "object"
-          ? parseInt(stock.id_product_attribute["#text"])
-          : parseInt(stock.id_product_attribute);
-      map[combinationId] = parseInt(stock.id);
+          ? stock.id_product_attribute["#text"]
+          : stock.id_product_attribute;
+      map[combinationId] = stock.id;
     }
     return map;
   } catch (error) {
@@ -201,13 +198,13 @@ async function createAttributeGroup(
 
   try {
     const response = await fetchFromPrestashopApi<{
-      product_option: { id: string };
+      product_option: { id: number };
     }>("/product_options", {
       method: "POST",
       headers: { "Content-Type": "application/xml" },
       body: xmlData,
     });
-    return parseInt(response.product_option.id);
+    return response.product_option.id;
   } catch (error) {
     console.error(`Error creating attribute group "${name}":`, error);
     throw error;
@@ -236,13 +233,13 @@ async function createAttributeValue(
 
   try {
     const response = await fetchFromPrestashopApi<{
-      product_option_value: { id: string };
+      product_option_value: { id: number };
     }>("/product_option_values", {
       method: "POST",
       headers: { "Content-Type": "application/xml" },
       body: xmlData,
     });
-    return parseInt(response.product_option_value.id);
+    return response.product_option_value.id;
   } catch (error) {
     console.error(`Error creating attribute value "${valueName}":`, error);
     throw error;
@@ -259,9 +256,9 @@ async function ensureAttributeGroupsExist(
   // Fetch existing attribute groups
   const response = await fetchFromPrestashopApi<{
     product_options: {
-      product_option: Array<{
-        id: string;
-        name: { language: Array<{ "@_id": string; "#text": string }> };
+      product_option: MaybeArray<{
+        id: number;
+        name: { language: Array<{ "@_id": number; "#text": string }> };
       }>;
     };
   }>("/product_options?display=[id,name]", { method: "GET" });
@@ -276,10 +273,10 @@ async function ensureAttributeGroupsExist(
   // Map existing groups
   for (const group of existingGroups) {
     const groupName = group.name.language.find(
-      (l) => l["@_id"] == languageIds[0].toString(),
+      (l) => l["@_id"] == languageIds[0],
     )?.["#text"];
     if (groupName) {
-      const groupId = parseInt(group.id);
+      const groupId = group.id;
       attributeGroupMap[groupName] = groupId;
       attributeValueMap[groupName] = {};
 
@@ -287,10 +284,10 @@ async function ensureAttributeGroupsExist(
       try {
         const valuesResponse = await fetchFromPrestashopApi<{
           product_option_values: {
-            product_option_value: Array<{
-              id: string;
-              id_attribute_group: string | { "#text": string };
-              name: { language: Array<{ "@_id": string; "#text": string }> };
+            product_option_value: MaybeArray<{
+              id: number;
+              id_attribute_group: number | { "#text": number };
+              name: { language: Array<{ "@_id": number; "#text": string }> };
             }>;
           };
         }>(
@@ -300,16 +297,14 @@ async function ensureAttributeGroupsExist(
 
         const existingValues =
           valuesResponse.product_option_values.product_option_value;
-        const valuesArray = Array.isArray(existingValues)
-          ? existingValues
-          : [existingValues];
+        const valuesArray = assureArray(existingValues);
 
         for (const value of valuesArray) {
           const valueName = value.name.language.find(
-            (l) => l["@_id"] == languageIds[0].toString(),
+            (l) => l["@_id"] == languageIds[0],
           )?.["#text"];
           if (valueName) {
-            attributeValueMap[groupName][valueName] = parseInt(value.id);
+            attributeValueMap[groupName][valueName] = value.id;
           }
         }
       } catch (error) {
@@ -666,6 +661,14 @@ export async function importVariantsFromFile(
           );
           await updateStockAvailable(stockAvailableId, stockInitial, language);
 
+          // Cache the price_ttc for the base product (combinationId = 0)
+          if (prixVenteTtc && prixVenteTtc.trim()) {
+            const parsedPrice = numeral(prixVenteTtc).value();
+            if (parsedPrice !== null && !isNaN(parsedPrice)) {
+              setCombinationPrice(productId, 0, parsedPrice);
+            }
+          }
+
           rows.push({
             index: index + 1,
             data: row,
@@ -733,6 +736,14 @@ export async function importVariantsFromFile(
 
         // Update stock quantity
         await updateStockAvailable(stockAvailableId, stockInitial, language);
+
+        // Cache the price_ttc for this combination so customer import can reuse it
+        if (prixVenteTtc && prixVenteTtc.trim()) {
+          const parsedPrice = numeral(prixVenteTtc).value();
+          if (parsedPrice !== null && !isNaN(parsedPrice)) {
+            setCombinationPrice(productId, combinationId, parsedPrice);
+          }
+        }
 
         rows.push({
           index: index + 1,

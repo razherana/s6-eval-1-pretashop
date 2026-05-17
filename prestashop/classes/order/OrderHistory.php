@@ -54,7 +54,7 @@ class OrderHistoryCore extends ObjectModel
             'id_order' => ['type' => self::TYPE_INT, 'validate' => 'isUnsignedId', 'required' => true],
             'id_order_state' => ['type' => self::TYPE_INT, 'validate' => 'isUnsignedId', 'required' => true],
             'id_employee' => ['type' => self::TYPE_INT, 'validate' => 'isUnsignedId'],
-            'date_add' => ['type' => self::TYPE_DATE, 'validate' => 'isDate'],
+            'date_add' => ['type' => self::TYPE_DATE, 'validate' => 'isDate', 'required' => true],
         ],
     ];
 
@@ -67,6 +67,7 @@ class OrderHistoryCore extends ObjectModel
             'id_employee' => ['xlink_resource' => 'employees'],
             'id_order_state' => ['required' => true, 'xlink_resource' => 'order_states'],
             'id_order' => ['xlink_resource' => 'orders'],
+            'date_add' => ['required' => true],
         ],
         'objectMethods' => [
             'add' => 'addWs',
@@ -93,6 +94,9 @@ class OrderHistoryCore extends ObjectModel
         } else {
             return;
         }
+
+        // Log loaded order date_add
+        file_put_contents('/tmp/debug.txt', 'Order date_add: ' . $order->date_add . "\n", FILE_APPEND);
 
         ShopUrl::cacheMainDomainForShop($order->id_shop);
 

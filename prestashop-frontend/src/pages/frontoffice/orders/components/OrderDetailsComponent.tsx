@@ -32,8 +32,8 @@ function buildCombinationName(combination: CombinationDetailXML, data: Frontoffi
     const optionValueDetail = data.productOptionValues.get(optionValue.id);
     if (!optionValueDetail) return `Option value unknown (ID: ${optionValue.id})`;
 
-    const optionGroupId = typeof optionValueDetail.id_attribute_group === 'string'
-      ? parseInt(optionValueDetail.id_attribute_group)
+    const optionGroupId = typeof optionValueDetail.id_attribute_group === 'object'
+      ? optionValueDetail.id_attribute_group["#text"]
       : optionValueDetail.id_attribute_group;
 
     const option = data.productOptions.get(optionGroupId);
@@ -82,7 +82,7 @@ export function OrderDetailsComponent({ orderId, language }: OrderDetailsProps) 
             if (!combinationsCache[combId]) {
               try {
                 const response = await fetchFromPrestashopApi<{
-                  combination?: CombinationDetailXML;
+                  combination: CombinationDetailXML;
                 }>(`/combinations/${combId}?display=full`, { method: "GET" });
 
                 const combinationData = response.combination;

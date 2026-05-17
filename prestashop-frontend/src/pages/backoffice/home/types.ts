@@ -1,5 +1,7 @@
 // src/pages/backoffice/home/types.ts
 
+import type { MaybeArray } from "@/utils/xml";
+
 export const ORDER_STATES = {
   AWAITING_CASH_ON_DELIVERY: 13, // Awaiting Cash On Delivery validation
   SHIPPED: 4, // Shipped
@@ -23,22 +25,15 @@ export interface ProductReadXML {
   name: LanguageField;
   associations: {
     images: {
-      image:
-        | [
-            {
-              id: number;
-              "@_xlink:href": string;
-            },
-          ]
-        | {
-            id: number;
-            "@_xlink:href": string;
-          };
+      image: MaybeArray<{
+        id: number;
+        "@_xlink:href": string;
+      }>;
     };
     combinations: {
-      combination: {
+      combination: MaybeArray<{
         id: number;
-      }[];
+      }>;
     };
   };
   price: number;
@@ -47,7 +42,7 @@ export interface ProductReadXML {
     | {
         "#text": number;
       }
-    | "";
+    | 0;
   price_ttc?: number;
   available_date: string;
 }
@@ -66,15 +61,11 @@ export interface CombinationDetailXML {
   weight?: number;
   minimal_quantity?: number;
   default_on?: string;
-  associations?: {
-    product_option_values?: {
-      product_option_value?:
-        | Array<{
-            id: number;
-          }>
-        | {
-            id: number;
-          };
+  associations: {
+    product_option_values: {
+      product_option_value?: MaybeArray<{
+        id: number;
+      }>;
     };
   };
 }
@@ -258,9 +249,11 @@ export interface TaxRuleReadXML {
 
 export interface ProductOptionValueDetail {
   id: number;
-  id_attribute_group: number | {
-    "#text": number;
-  };
+  id_attribute_group:
+    | number
+    | {
+        "#text": number;
+      };
   name: LanguageField;
   color?: string;
   position?: number;

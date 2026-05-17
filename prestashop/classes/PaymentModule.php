@@ -351,7 +351,8 @@ abstract class PaymentModuleCore extends Module
                     self::DEBUG_MODE,
                     $order_status,
                     $id_order_state,
-                    isset($package['id_carrier']) ? $package['id_carrier'] : null
+                    isset($package['id_carrier']) ? $package['id_carrier'] : null,
+                    $extra_vars
                 );
                 $order = $orderData['order'];
                 $order_list[] = $order;
@@ -578,6 +579,8 @@ abstract class PaymentModuleCore extends Module
             // Set the order status
             $new_history = new OrderHistory();
             $new_history->id_order = (int) $order->id;
+            $new_history->date_add = $extra_vars['date_add'] ?? date('Y-m-d H:i:s');
+            $new_history->date_upd = $extra_vars['date_upd'] ?? date('Y-m-d H:i:s');
             $new_history->changeIdOrderState((int) $id_order_state, $order, true);
             $new_history->addWithemail(true, $extra_vars);
 
@@ -970,7 +973,8 @@ abstract class PaymentModuleCore extends Module
         $debug,
         $order_status,
         $id_order_state,
-        $carrierId = null
+        $carrierId = null,
+        $extra_vars = []
     ) {
         $order = new Order();
         $order->product_list = $productList;
@@ -1004,6 +1008,8 @@ abstract class PaymentModuleCore extends Module
         $order->reference = $reference;
         $order->id_shop = (int) $context->shop->id;
         $order->id_shop_group = (int) $context->shop->id_shop_group;
+        $order->date_add = $extra_vars['date_add'] ?? date('Y-m-d H:i:s');
+        $order->date_upd = $extra_vars['date_upd'] ?? date('Y-m-d H:i:s');
 
         $order->secure_key = ($secure_key ? pSQL($secure_key) : pSQL($context->customer->secure_key));
         $order->payment = $payment_method;

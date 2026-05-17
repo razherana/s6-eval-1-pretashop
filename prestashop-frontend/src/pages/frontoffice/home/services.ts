@@ -106,10 +106,10 @@ async function filterProductsByCombinationPrice(
 
   // Separate products with and without combinations
   const productsWithCombinations = products.filter(
-    (p) => p.associations.combinations?.combination?.length > 0,
+    (p) => assureArray(p.associations.combinations?.combination).length > 0,
   );
   const productsWithoutCombinations = products.filter(
-    (p) => !p.associations.combinations?.combination?.length,
+    (p) => !assureArray(p.associations.combinations?.combination).length,
   );
 
   // Products without combinations: check base price
@@ -141,7 +141,7 @@ async function filterWithCombinations(
   // Fetch all combinations for these products in parallel
   const combinationChecks = products.map(async (product) => {
     try {
-      const combinationIds = product.associations.combinations.combination.map(
+      const combinationIds = assureArray(product.associations.combinations.combination).map(
         (c) => c.id,
       );
 

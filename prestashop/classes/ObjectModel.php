@@ -598,10 +598,10 @@ abstract class ObjectModelCore implements \PrestaShop\PrestaShop\Core\Foundation
         Hook::exec('actionObject' . $this->getFullyQualifiedName() . 'AddBefore', ['object' => $this]);
 
         // Automatically fill dates
-        if ($auto_date && property_exists($this, 'date_add')) {
+        if ($auto_date && property_exists($this, 'date_add') && empty($this->date_add)) {
             $this->date_add = date('Y-m-d H:i:s');
         }
-        if ($auto_date && property_exists($this, 'date_upd')) {
+        if ($auto_date && property_exists($this, 'date_upd') && empty($this->date_upd)) {
             $this->date_upd = date('Y-m-d H:i:s');
         }
 

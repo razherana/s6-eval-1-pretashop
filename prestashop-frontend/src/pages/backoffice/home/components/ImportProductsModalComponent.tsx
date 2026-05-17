@@ -2,6 +2,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import React, { useState, useRef } from "react";
 import {
   type ImportedRow,
+  type ImportMode,
 } from "../services";
 
 import { importProductsFromFile } from "../import-services/product-import";
@@ -15,9 +16,13 @@ import { type ImportStep, type FileStates, type TotalStats } from "../services";
 import { useLanguage } from "@/utils/lang";
 import { toast } from "sonner";
 import { verifyDataForImport } from "../import-services/verify-import";
+import { clearCombinationPriceCache } from "../import-services/combinationPriceCache";
 import { LanguageLoadingComponent } from "@/components/ui-manual/language-loading-state";
 
 export function ImportProductsModalComponent({ open, setOpen }: { open: boolean, setOpen: React.Dispatch<React.SetStateAction<boolean>> }) {
+  // Import mode
+  const [importMode, setImportMode] = useState<ImportMode>("all");
+
   // File states
   const [fileStates, setFileStates] = useState<FileStates>({
     products: null,
@@ -78,7 +83,7 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
   const customersInputRef = useRef<HTMLInputElement>(null);
   const zipInputRef = useRef<HTMLInputElement>(null);
 
-  const importSteps: ImportStep[] = [
+  const allImportSteps: ImportStep[] = [
     {
       id: "products",
       label: "Fichier 1 - Products",
@@ -113,6 +118,21 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
     }
   ];
 
+  const getImportSteps = (mode: ImportMode): ImportStep[] => {
+    switch (mode) {
+      case "products-variants":
+        return allImportSteps.filter(s => s.id === "products" || s.id === "variants");
+      case "customers":
+        return allImportSteps.filter(s => s.id === "customers");
+      case "images":
+        return allImportSteps.filter(s => s.id === "zip");
+      default:
+        return allImportSteps;
+    }
+  };
+
+  const importSteps = getImportSteps(importMode);
+
   const handleFileChange = (stepId: string, event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (!selectedFile) return;
@@ -146,139 +166,185 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
   };
 
   const allRequiredStepsComplete = (): boolean => {
-    return importSteps.every(step => isStepComplete(step.id));
+    const steps = getImportSteps(importMode);
+    return steps.every(step => isStepComplete(step.id));
   };
 
   const handleImport = async () => {
     setIsImporting(true);
     setProgress(0);
     setImportComplete(false);
+    clearCombinationPriceCache();
 
     const languageIds = language.rawLanguages?.map(l => l.id) || [1, 2, 3];
 
+    // Reset results based on mode
+    setProductsResults([]);
+    setVariantsResults([]);
+    setCustomersResults([]);
+    setImagesResults([]);
+
+    let pImport: Awaited<ReturnType<typeof importProductsFromFile>> | null = null;
+    let vImport: Awaited<ReturnType<typeof importVariantsFromFile>> | null = null;
+    let cImport: Awaited<ReturnType<typeof importCustomersFromFile>> | null = null;
+    let iResult: Awaited<ReturnType<typeof importImagesFromZip>> | null = null;
+
     try {
-      // Step 0: Verify data
-      await verifyDataForImport(
-        fileStates,
-        delimiter,
-        decimalSeparator,
-        dateFormat
-      );
+      let stepIndex = 0;
 
-      // Step 1: Products
-      setCurrentStep(0);
-      setCurrentFileProgress(0);
+      // Products (Fichier 1)
+      if (importMode === "all" || importMode === "products-variants") {
+        await verifyDataForImport(
+          fileStates,
+          delimiter,
+          decimalSeparator,
+          dateFormat,
+          importMode
+        );
 
-      const productsImportPromise = importProductsFromFile(
-        fileStates.products!,
-        delimiter,
-        decimalSeparator,
-        languageIds,
-        dateFormat
-      );
+        setCurrentStep(stepIndex);
+        setCurrentFileProgress(0);
 
-      let progressInterval = setInterval(() => {
-        setCurrentFileProgress(prev => Math.min(prev + Math.random() * 15, 90));
-        setProgress(prev => Math.min(prev + Math.random() * 2, 22));
-      }, 200);
+        const productsImportPromise = importProductsFromFile(
+          fileStates.products!,
+          delimiter,
+          decimalSeparator,
+          languageIds,
+          dateFormat
+        );
 
-      const productsImport = await productsImportPromise;
-      clearInterval(progressInterval);
-      setCurrentFileProgress(100);
-      setProgress(25);
-      setProductsResults(productsImport.rows);
+        const progressInterval = setInterval(() => {
+          setCurrentFileProgress(prev => Math.min(prev + Math.random() * 15, 90));
+          setProgress(prev => Math.min(prev + Math.random() * 2, 22));
+        }, 200);
 
-      // Step 2: Variants
-      setCurrentStep(1);
-      setCurrentFileProgress(0);
+        pImport = await productsImportPromise;
+        clearInterval(progressInterval);
+        setCurrentFileProgress(100);
+        setProgress(25);
+        setProductsResults(pImport.rows);
+        stepIndex++;
+      }
 
-      const variantsImportPromise = importVariantsFromFile(
-        fileStates.variants!,
-        delimiter,
-        decimalSeparator,
-        languageIds,
-        productsImport.availableDateReferenceMap,
-        dateFormat,
-        language
-      );
+      // Variants (Fichier 2)
+      if (importMode === "all" || importMode === "products-variants") {
+        setCurrentStep(stepIndex);
+        setCurrentFileProgress(0);
 
-      progressInterval = setInterval(() => {
-        setCurrentFileProgress(prev => Math.min(prev + Math.random() * 15, 90));
-        setProgress(prev => Math.min(prev + Math.random() * 2, 48));
-      }, 200);
+        const availableDateRefMap = (pImport?.availableDateReferenceMap ?? {}) as Record<string, string>;
+        const variantsImportPromise = importVariantsFromFile(
+          fileStates.variants!,
+          delimiter,
+          decimalSeparator,
+          languageIds,
+          availableDateRefMap,
+          dateFormat,
+          language
+        );
 
-      const variantsImport = await variantsImportPromise;
-      clearInterval(progressInterval);
-      setCurrentFileProgress(100);
-      setProgress(50);
-      setVariantsResults(variantsImport.rows);
+        const progressInterval = setInterval(() => {
+          setCurrentFileProgress(prev => Math.min(prev + Math.random() * 15, 90));
+          setProgress(prev => Math.min(prev + Math.random() * 2, 48));
+        }, 200);
 
-      // Step 3: Customers
-      setCurrentStep(2);
-      setCurrentFileProgress(0);
+        vImport = await variantsImportPromise;
+        clearInterval(progressInterval);
+        setCurrentFileProgress(100);
+        setProgress(50);
+        setVariantsResults(vImport.rows);
+        stepIndex++;
+      }
 
-      const customersImportPromise = importCustomersFromFile(
-        fileStates.customers!,
-        delimiter,
-        decimalSeparator,
-        languageIds,
-        language,
-        dateFormat
-      );
-
-      progressInterval = setInterval(() => {
-        setCurrentFileProgress(prev => Math.min(prev + Math.random() * 15, 90));
-        setProgress(prev => Math.min(prev + Math.random() * 2, 73));
-      }, 200);
-
-      const customersImport = await customersImportPromise;
-      clearInterval(progressInterval);
-      setCurrentFileProgress(100);
-      setProgress(75);
-      setCustomersResults(customersImport.rows);
-
-      // Step 4: ZIP Image Processing
-      setCurrentStep(3);
-      setCurrentFileProgress(0);
-
-      const imagesResult = await importImagesFromZip(
-        fileStates.zip!,
-        (zipProgress) => {
-          setCurrentFileProgress(zipProgress);
-          setProgress(75 + (25 * zipProgress) / 100);
+      // Customers (Fichier 3)
+      if (importMode === "all" || importMode === "customers") {
+        if (importMode === "customers") {
+          await verifyDataForImport(
+            fileStates,
+            delimiter,
+            decimalSeparator,
+            dateFormat,
+            importMode
+          );
         }
-      );
 
-      setImagesResults(imagesResult.rows);
+        setCurrentStep(stepIndex);
+        setCurrentFileProgress(0);
+
+        const customersImportPromise = importCustomersFromFile(
+          fileStates.customers!,
+          delimiter,
+          decimalSeparator,
+          languageIds,
+          language,
+          dateFormat
+        );
+
+        const progressInterval = setInterval(() => {
+          setCurrentFileProgress(prev => Math.min(prev + Math.random() * 15, 90));
+          setProgress(prev => Math.min(prev + Math.random() * 2, 73));
+        }, 200);
+
+        cImport = await customersImportPromise;
+        clearInterval(progressInterval);
+        setCurrentFileProgress(100);
+        setProgress(75);
+        setCustomersResults(cImport.rows);
+        stepIndex++;
+      }
+
+      // ZIP Images
+      if (importMode === "all" || importMode === "images") {
+        if (importMode === "images") {
+          await verifyDataForImport(
+            fileStates,
+            delimiter,
+            decimalSeparator,
+            dateFormat
+          );
+        }
+
+        setCurrentStep(stepIndex);
+        setCurrentFileProgress(0);
+
+        iResult = await importImagesFromZip(
+          fileStates.zip!,
+          (zipProgress) => {
+            setCurrentFileProgress(zipProgress);
+            setProgress(75 + (25 * zipProgress) / 100);
+          }
+        );
+
+        setImagesResults(iResult.rows);
+        stepIndex++;
+      }
 
       setTotalStats({
-        totalProducts: productsImport.summary.totalRows,
-        successProducts: productsImport.summary.successCount,
-        failedProducts: productsImport.summary.failedCount,
-        totalVariants: variantsImport.summary.totalRows,
-        successVariants: variantsImport.summary.successCount,
-        failedVariants: variantsImport.summary.failedCount,
-        totalCustomers: customersImport.summary.totalRows,
-        successCustomers: customersImport.summary.successCount,
-        failedCustomers: customersImport.summary.failedCount,
-        totalImages: imagesResult.summary.totalRows,
-        successImages: imagesResult.summary.successCount,
-        failedImages: imagesResult.summary.failedCount,
+        totalProducts: pImport?.summary.totalRows ?? 0,
+        successProducts: pImport?.summary.successCount ?? 0,
+        failedProducts: pImport?.summary.failedCount ?? 0,
+        totalVariants: vImport?.summary.totalRows ?? 0,
+        successVariants: vImport?.summary.successCount ?? 0,
+        failedVariants: vImport?.summary.failedCount ?? 0,
+        totalCustomers: cImport?.summary.totalRows ?? 0,
+        successCustomers: cImport?.summary.successCount ?? 0,
+        failedCustomers: cImport?.summary.failedCount ?? 0,
+        totalImages: iResult?.summary.totalRows ?? 0,
+        successImages: iResult?.summary.successCount ?? 0,
+        failedImages: iResult?.summary.failedCount ?? 0,
       });
 
       setProgress(100);
       setIsImporting(false);
       setImportComplete(true);
 
-      // Show success/error toasts
-      const totalSuccess = productsImport.summary.successCount +
-        variantsImport.summary.successCount +
-        customersImport.summary.successCount +
-        imagesResult.summary.successCount;
-      const totalFailed = productsImport.summary.failedCount +
-        variantsImport.summary.failedCount +
-        customersImport.summary.failedCount +
-        imagesResult.summary.failedCount;
+      const totalSuccess = (pImport?.summary.successCount ?? 0) +
+        (vImport?.summary.successCount ?? 0) +
+        (cImport?.summary.successCount ?? 0) +
+        (iResult?.summary.successCount ?? 0);
+      const totalFailed = (pImport?.summary.failedCount ?? 0) +
+        (vImport?.summary.failedCount ?? 0) +
+        (cImport?.summary.failedCount ?? 0) +
+        (iResult?.summary.failedCount ?? 0);
 
       if (totalFailed === 0) {
         toast.success(`Import complete! ${totalSuccess} items processed successfully`);
@@ -296,6 +362,7 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
   };
 
   const handleReset = () => {
+    clearCombinationPriceCache();
     setFileStates({ products: null, variants: null, customers: null, zip: null });
     setCurrentStep(-1);
     setIsImporting(false);
@@ -309,7 +376,7 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
     setCurrentPage(1);
   };
 
-  if(!language)
+  if (!language)
     return <LanguageLoadingComponent />;
 
   return (
@@ -337,6 +404,8 @@ export function ImportProductsModalComponent({ open, setOpen }: { open: boolean,
         ) : (
           <ImportConfigurationView
             importSteps={importSteps}
+            importMode={importMode}
+            setImportMode={setImportMode}
             fileStates={fileStates}
             delimiter={delimiter}
             setDelimiter={setDelimiter}

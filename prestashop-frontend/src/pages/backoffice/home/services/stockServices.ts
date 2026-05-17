@@ -180,31 +180,11 @@ export async function updateStockQuantity(
     console.log(
       `Created stock movement with ID ${movementId} for stock ${stockId}`,
     );
-
-    // Update date_add
-    if (movementId) {
-      const updateData: Record<string, string> = {
-        date_add: dateAdd,
-        id: movementId.toString(),
-      };
-      const updateXml = movementConverter.convertRowToXML(updateData);
-
-      await fetchFromPrestashopApi(
-        `/stock_movements/${movementId}?ps_method=PATCH`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/xml" },
-          body: updateXml,
-        },
-      );
-    }
   } catch (error) {
     console.error("Error updating stock:", error);
     toast.error("Failed to update stock");
     throw error;
   }
-
-  toast.success(`Stock updated to ${quantity}`);
 }
 
 // Fetch stock quantity as it was at a given date (or current if no date provided)

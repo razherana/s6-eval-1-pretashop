@@ -1,6 +1,6 @@
 // src/pages/backoffice/home/import-services/customer-import.ts
 import { fetchFromPrestashopApi } from "@/utils/url";
-import { assureArray, PrestaShopXMLConverter } from "@/utils/xml";
+import { assureArray, PrestaShopXMLConverter, type MaybeArray } from "@/utils/xml";
 import {
   type ImportResult,
   type ImportedRow,
@@ -16,17 +16,21 @@ import { orderPaymentSchema } from "@/schemas/orderPayment";
 import { updateStockQuantity } from "../services/stockServices";
 import { toast } from "sonner";
 import {
+  getCombinationPrice,
+  setCombinationPrice,
+  hasCombinationPrice,
+  combinationPriceMap,
+} from "./combinationPriceCache";
+import {
   ORDER_STATES,
   type LanguageField,
   type OrderHistoryXML,
-  type OrderInvoiceXML,
   type OrderPaymentXML,
   type OrderReadXML,
 } from "../types";
-import { parse } from "date-fns";
+import { format, parse } from "date-fns";
 import { utc } from "@date-fns/utc";
 import type { LanguageData } from "@/contexts/LanguageContext";
-import { orderInvoiceSchema } from "@/schemas/orderInvoice";
 
 const USER_GROUP_ACCESS = [1, 2, 3];
 const COUNTRY_ID = 8;
@@ -42,7 +46,7 @@ interface ProductReferenceMap {
     id: number;
     price: number;
     price_ttc: number;
-    combinations?: {
+    combinations: {
       [optionValue: string]: {
         id: number;
         price: number;
@@ -166,7 +170,7 @@ async function createCustomerAddress(
 }
 
 // Fetch all products with their references and combinations
-async function fetchProductReferences(): Promise<ProductReferenceMap> {
+export async function fetchProductReferences(): Promise<ProductReferenceMap> {
   try {
     const urlQuery = new URLSearchParams({
       display: "full",
@@ -181,27 +185,25 @@ async function fetchProductReferences(): Promise<ProductReferenceMap> {
           reference: string;
           price: number;
           price_ttc: number;
-          associations?: {
-            combinations?: {
-              combination?: Array<{ id: number }>;
+          associations: {
+            combinations: {
+              combination: MaybeArray<{ id: number }>;
             };
           };
         }>;
       };
     }>("/products?" + urlQuery.toString(), { method: "GET" });
 
-    const products = Array.isArray(productsResponse.products?.product)
-      ? productsResponse.products.product
-      : [productsResponse.products?.product].filter(Boolean);
+    const products = assureArray(productsResponse.products.product);
 
     const map: ProductReferenceMap = {};
 
     interface Combination {
       id: number;
       price: number;
-      associations?: {
-        product_option_values?: {
-          product_option_value?: Array<{ id: string }> | { id: string };
+      associations: {
+        product_option_values: {
+          product_option_value: MaybeArray<{ id: number }>;
         };
       };
     }
@@ -209,69 +211,66 @@ async function fetchProductReferences(): Promise<ProductReferenceMap> {
     // Fetch all combinations, product_option_values, product_options into a map to minimize API calls
     const combinationMap = new Map<number, Combination>();
     const optionValueMap = new Map<
-      string,
-      { id_attribute_group: string; name: string }
+      number,
+      { id_attribute_group: number; name: string }
     >(); // id -> {id_attribute_group, name}
-    const optionMap = new Map<string, string>(); // id -> name
+    const optionMap = new Map<number, string>(); // id -> name
 
     {
       const combinationsResponse = await fetchFromPrestashopApi<{
         combinations: {
-          combination: Array<Combination>;
+          combination: MaybeArray<Combination>;
         };
       }>("/combinations?display=full", { method: "GET" });
 
-      const combinations = Array.isArray(
+      const combinations = assureArray(
         combinationsResponse.combinations?.combination,
-      )
-        ? combinationsResponse.combinations.combination
-        : [combinationsResponse.combinations?.combination].filter(Boolean);
+      );
 
       for (const comb of combinations) combinationMap.set(comb.id, comb);
 
       const optionValuesResponse = await fetchFromPrestashopApi<{
         product_option_values: {
-          product_option_value: Array<{
-            id: string;
+          product_option_value: MaybeArray<{
+            id: number;
             name: LanguageField;
-            id_attribute_group: {
-              "#text": string;
-            };
+            id_attribute_group:
+              | {
+                  "#text": number;
+                }
+              | 0;
           }>;
         };
       }>("/product_option_values?display=full", { method: "GET" });
 
-      const optionValues = Array.isArray(
+      const optionValues = assureArray(
         optionValuesResponse.product_option_values?.product_option_value,
-      )
-        ? optionValuesResponse.product_option_values.product_option_value
-        : [
-            optionValuesResponse.product_option_values?.product_option_value,
-          ].filter(Boolean);
+      );
 
       for (const ov of optionValues) {
         const nameObj = ov.name.language[0];
         const name = nameObj?.["#text"] || "";
         optionValueMap.set(ov.id, {
-          id_attribute_group: ov.id_attribute_group["#text"],
-          name,
+          id_attribute_group:
+            typeof ov.id_attribute_group === "object"
+              ? ov.id_attribute_group["#text"]
+              : ov.id_attribute_group,
+          name: String(name), // Ensure it's a string, even if empty
         });
       }
 
       const optionsResponse = await fetchFromPrestashopApi<{
         product_options: {
-          product_option: Array<{
-            id: string;
+          product_option: MaybeArray<{
+            id: number;
             name: LanguageField;
           }>;
         };
       }>("/product_options?display=full", { method: "GET" });
 
-      const options = Array.isArray(
+      const options = assureArray(
         optionsResponse.product_options?.product_option,
-      )
-        ? optionsResponse.product_options.product_option
-        : [optionsResponse.product_options?.product_option].filter(Boolean);
+      );
 
       for (const opt of options) {
         const nameObj = opt.name.language[0];
@@ -295,7 +294,10 @@ async function fetchProductReferences(): Promise<ProductReferenceMap> {
       };
 
       // Fetch combinations if product has any
-      const combIds = product.associations?.combinations?.combination;
+      const combIds = assureArray(
+        product.associations.combinations?.combination,
+      );
+
       if (combIds && combIds.length > 0) {
         for (const comb of combIds) {
           const combination = combinationMap.get(comb.id);
@@ -306,26 +308,22 @@ async function fetchProductReferences(): Promise<ProductReferenceMap> {
               combination.associations?.product_option_values
                 ?.product_option_value;
 
-            if (optionValues) {
-              const ovArray = Array.isArray(optionValues)
-                ? optionValues
-                : [optionValues];
+            const ovArray = assureArray(optionValues);
 
-              for (const ov of ovArray) {
-                const ovData = optionValueMap.get(ov.id);
+            for (const ov of ovArray) {
+              const ovData = optionValueMap.get(ov.id);
 
-                if (ovData) {
-                  // Get name
-                  const optionName =
-                    optionMap.get(ovData.id_attribute_group) || "";
+              if (ovData) {
+                // Get name
+                const optionName =
+                  optionMap.get(ovData.id_attribute_group) || "";
 
-                  if (ovData.name && optionName) {
-                    productEntry.combinations![ovData.name.toLowerCase()] = {
-                      id: combination.id,
-                      price: combination.price,
-                      name: optionName + ": " + ovData.name,
-                    };
-                  }
+                if (ovData.name && optionName) {
+                  productEntry.combinations![ovData.name.toLowerCase()] = {
+                    id: combination.id,
+                    price: combination.price,
+                    name: optionName + ": " + ovData.name,
+                  };
                 }
               }
             }
@@ -374,6 +372,7 @@ export async function createCart(
     allow_seperated_package: "0",
     cart_rows: cartRowsString,
     date_add: date_add_to_use,
+    date_upd: date_add_to_use,
   };
 
   const xmlData = converter.convertRowToXML(cartData);
@@ -388,21 +387,6 @@ export async function createCart(
     });
 
     const id = response.cart.id;
-
-    // Update date_add and date_upd to match the original date if provided (PrestaShop API doesn't allow setting these on creation)
-    if (date_add_to_use) {
-      const updateData = converter.convertRowToXML({
-        id: id.toString(),
-        date_add: date_add_to_use,
-        date_upd: date_add_to_use,
-      });
-
-      await fetchFromPrestashopApi(`/carts/${id}?ps_method=PATCH`, {
-        method: "POST",
-        headers: { "Content-Type": "application/xml" },
-        body: updateData,
-      });
-    }
 
     return id;
   } catch (error) {
@@ -516,18 +500,6 @@ export async function createOrder(
     // Add initial state back
     await updateOrderState(orderData.id, initialStateId, date_add_to_use);
 
-    // Update order date_add and date_upd to match the original date (PrestaShop API doesn't allow setting these on creation)
-    const updateOrderData = converter.convertRowToXML({
-      id: orderData.id.toString(),
-      date_add: date_add_to_use,
-    });
-
-    await fetchFromPrestashopApi(`/orders/${orderData.id}?ps_method=PATCH`, {
-      method: "POST",
-      headers: { "Content-Type": "application/xml" },
-      body: updateOrderData,
-    });
-
     return orderData;
   } catch (error) {
     console.error("Error creating order:", error);
@@ -562,28 +534,7 @@ export async function updateOrderState(
       body: xmlData,
     });
 
-    const orderHistory = response.order_history;
-
-    // Update date_add if provided
-    if (date_add) {
-      const updateData = converter.convertRowToXML({
-        id: orderHistory.id.toString(),
-        date_add: date_add,
-      });
-
-      await fetchFromPrestashopApi(
-        `/order_histories/${orderHistory.id}?ps_method=PATCH`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/xml" },
-          body: updateData,
-        },
-      );
-
-      orderHistory.date_add = date_add;
-    }
-
-    return orderHistory;
+    return response.order_history;
   } catch (error) {
     console.error(`Error updating order state to ${orderStateId}:`, error);
     throw error;
@@ -592,7 +543,7 @@ export async function updateOrderState(
 
 // Add payment to order
 export async function addOrderPayment(
-  orderId: number,
+  _orderId: number,
   orderReference: string,
   amount: number,
   date_add?: string,
@@ -610,6 +561,10 @@ export async function addOrderPayment(
     payment_method: paymentMethod,
     conversion_rate: "1",
     transaction_id: transactionId,
+    date_add:
+      date_add || format(new Date(), "yyyy-MM-dd HH:mm:ss", { in: utc }),
+    date_upd:
+      date_add || format(new Date(), "yyyy-MM-dd HH:mm:ss", { in: utc }),
   };
 
   const xmlData = converter.convertRowToXML(paymentData);
@@ -623,63 +578,7 @@ export async function addOrderPayment(
       body: xmlData,
     });
 
-    const orderPayment = response.order_payment;
-
-    // Update date_add if provided
-    if (date_add) {
-      const updateData = converter.convertRowToXML({
-        id: orderPayment.id.toString(),
-        date_add: date_add,
-      });
-
-      await fetchFromPrestashopApi(
-        `/order_payments/${orderPayment.id}?ps_method=PATCH`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/xml" },
-          body: updateData,
-        },
-      );
-
-      orderPayment.date_add = date_add;
-
-      // Also update order_invoice date_add
-      const converterInvoice = new PrestaShopXMLConverter(
-        orderInvoiceSchema,
-        "",
-      );
-
-      // Fetch invoice ID for the order
-      const invoiceResponse = await fetchFromPrestashopApi<{
-        order_invoices: {
-          order_invoice: OrderInvoiceXML;
-        };
-      }>(`/order_invoices?filter[id_order]=${orderId}&display=[id]`, {
-        method: "GET",
-        headers: { "Content-Type": "application/xml" },
-      });
-
-      if (
-        invoiceResponse.order_invoices &&
-        invoiceResponse.order_invoices.order_invoice
-      ) {
-        const updateInvoiceData = converterInvoice.convertRowToXML({
-          id: invoiceResponse.order_invoices.order_invoice.id.toString(),
-          date_add: date_add,
-        });
-
-        await fetchFromPrestashopApi(
-          `/order_invoices/${invoiceResponse.order_invoices.order_invoice.id}?ps_method=PATCH`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/xml" },
-            body: updateInvoiceData,
-          },
-        );
-      }
-    }
-
-    return orderPayment;
+    return response.order_payment;
   } catch (error) {
     console.error("Error adding payment:", error);
     throw error;
@@ -782,6 +681,12 @@ export async function processCompleteOrderFlow(
   // This will create 2 order payments, so we need to delete those two and keep only one with the correct date
   await updateOrderState(orderId, ORDER_STATES.PAYMENT_ACCEPTED, date_add);
 
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  await updateOrderState(orderId, ORDER_STATES.SHIPPED, date_add);
+
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  await updateOrderState(orderId, ORDER_STATES.DELIVERED, date_add);
+
   if (deleteGeneratedPayments) {
     // Get all payments id for the order and filter idOrderPayment.id !== orderPayment.id
     const paymentsResponse = await fetchFromPrestashopApi<{
@@ -803,12 +708,6 @@ export async function processCompleteOrderFlow(
           method: "DELETE",
         });
   }
-
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  await updateOrderState(orderId, ORDER_STATES.SHIPPED, date_add);
-
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  await updateOrderState(orderId, ORDER_STATES.DELIVERED, date_add);
 }
 
 // Main import function
@@ -821,6 +720,8 @@ export async function importCustomersFromFile(
   dateFormat: string,
 ): Promise<ImportResult> {
   const parsedRows = await parseCsvFile(file, delimiter);
+
+  console.log("Cached product references before import:", combinationPriceMap);
 
   try {
     // Step 1: Fetch existing customers and products
@@ -851,7 +752,6 @@ export async function importCustomersFromFile(
 
     // Step 2: Process each row
     const rows: ImportedRow[] = [];
-    const combinationPriceCache = new Map<string, number>();
 
     for (const [index, row] of parsedRows.entries()) {
       const nom = row.nom;
@@ -909,7 +809,6 @@ export async function importCustomersFromFile(
           customerId = existingCustomerId;
           console.log(`Using existing customer "${email}" (ID: ${customerId})`);
         } else {
-          toast.info(`Creating customer: ${email}`);
           customerId = await createCustomer(
             firstName,
             lastName,
@@ -934,7 +833,7 @@ export async function importCustomersFromFile(
 
           if (parsedItems.length > 0) {
             console.log(
-              `Processing ${parsedItems.length} items for customer ${customerId}`,
+              `Processing ${parsedItems} items for customer ${customerId}`,
             );
 
             // Resolve product references to IDs
@@ -964,7 +863,7 @@ export async function importCustomersFromFile(
               };
 
               // Check if there's a combination (attribute)
-              if (item.attribute && product.combinations) {
+              if (item.attribute !== "" && product.combinations) {
                 const attrLower = item.attribute.toLowerCase();
                 const combination = product.combinations[attrLower];
 
@@ -978,14 +877,15 @@ export async function importCustomersFromFile(
                     `Product ${item.reference} has combination "${item.attribute}" with price impact ${combination.price}`,
                   );
 
-                  // Check if in cache
-                  if (combinationPriceCache.has(combination.id.toString())) {
-                    cartItem.price_ttc = combinationPriceCache.get(
-                      combination.id.toString(),
+                  // Check if in shared cache (populated by variant import)
+                  if (hasCombinationPrice(product.id, combination.id)) {
+                    cartItem.price_ttc = getCombinationPrice(
+                      product.id,
+                      combination.id,
                     )!;
 
                     console.log(
-                      `Using cached price_ttc for combination ${combination.id}: ${cartItem.price_ttc}`,
+                      `Using cached price_ttc for product ${product.id}, combination ${combination.id}: ${cartItem.price_ttc}`,
                     );
                   } else {
                     try {
@@ -1005,10 +905,7 @@ export async function importCustomersFromFile(
 
                       cartItem.price_ttc = priceTtc;
 
-                      combinationPriceCache.set(
-                        combination.id.toString(),
-                        priceTtc,
-                      );
+                      setCombinationPrice(product.id, combination.id, priceTtc);
                     } catch {
                       console.warn(
                         `Could not fetch tax price for combination ${combination.id}`,
@@ -1067,9 +964,6 @@ export async function importCustomersFromFile(
                   success: true,
                   warnings: warnings.length > 0 ? warnings : undefined,
                 });
-                toast.success(
-                  `Processed (cart created): ${cartId} for ${email}`,
-                );
                 continue;
               }
 
@@ -1149,8 +1043,6 @@ export async function importCustomersFromFile(
           success: true,
           warnings: warnings.length > 0 ? warnings : undefined,
         });
-
-        toast.success(`Processed: ${email}`);
       } catch (error) {
         console.error(`Error importing customer at row ${index + 1}:`, error);
         rows.push({
@@ -1159,14 +1051,11 @@ export async function importCustomersFromFile(
           success: false,
           error:
             error instanceof Error
-              ? error.message
+              ? (error as Error).message
               : "Failed to process customer",
         });
-        toast.error(`Failed: ${email}`);
       }
     }
-
-    toast.success("Customer import completed!");
 
     return {
       summary: buildImportSummary("Customers", file.name, rows),
@@ -1174,7 +1063,6 @@ export async function importCustomersFromFile(
     };
   } catch (error) {
     console.error("Error in customer import:", error);
-    toast.error("Customer import failed");
     return {
       summary: {
         step: "Customers",

@@ -1,5 +1,5 @@
 import { isMatch } from "date-fns";
-import { parseCsvFile, type FileStates } from "../services";
+import { parseCsvFile, type FileStates, type ImportMode } from "../services";
 import numeral from "numeral";
 
 export const COLUMNS_PER_CSV: { [key: string]: string[] } = {
@@ -32,6 +32,64 @@ export const COLUMNS_PER_CSV_PRICE_COLUMNS: { [key: string]: string[] } = {
   variants: ["prix_vente_ttc"],
 };
 
+async function validateCsvFile(
+  file: File | null,
+  fileType: "products" | "variants" | "customers",
+  delimiter: string,
+  dateFormat: string,
+): Promise<void> {
+  if (!file) {
+    throw new Error(
+      `Le fichier ${fileType === "products" ? "produits" : fileType === "variants" ? "variantes" : "clients"} est requis pour cette importation.`,
+    );
+  }
+
+  const rows = await parseCsvFile(file, delimiter);
+  const columns = Object.keys(rows[0] || {});
+  const expectedColumns = COLUMNS_PER_CSV[fileType];
+  const missingColumns = expectedColumns.filter(
+    (col) => !columns.includes(col),
+  );
+
+  if (missingColumns.length > 0) {
+    const label =
+      fileType === "products"
+        ? "produits"
+        : fileType === "variants"
+          ? "variantes"
+          : "clients";
+    throw new Error(
+      `Le fichier ${label} manque les colonnes suivantes : ${missingColumns.join(", ")}`,
+    );
+  }
+
+  // Verify date formats
+  const dateColumns = COLUMNS_PER_CSV_DATE_COLUMNS[fileType] || [];
+  for (const dateCol of dateColumns) {
+    for (const row of rows) {
+      const dateValue = row[dateCol];
+      if (dateValue && !isMatch(dateValue, dateFormat)) {
+        throw new Error(
+          `Le format de la date dans la colonne "${dateCol}" est invalide : ${dateValue}`,
+        );
+      }
+    }
+  }
+
+  // Verify prices
+  const priceColumns = COLUMNS_PER_CSV_PRICE_COLUMNS[fileType] || [];
+  for (const priceCol of priceColumns) {
+    for (const row of rows) {
+      const priceValue = row[priceCol];
+      if (priceValue && !isValidPrice(priceValue)) {
+        throw new Error(
+          `Le prix dans la colonne "${priceCol}" est invalide : ${priceValue}`,
+        );
+      }
+    }
+  }
+}
+
 /**
  * Verify data and configurations before starting the import process. Throws an error if any issues are found.
  * This checks :
@@ -42,12 +100,14 @@ export const COLUMNS_PER_CSV_PRICE_COLUMNS: { [key: string]: string[] } = {
  * @param fileStates
  * @param delimiter
  * @param decimalSeparator
+ * @param mode - Which files to validate (default "all")
  */
 export async function verifyDataForImport(
   fileStates: FileStates,
   delimiter: string,
   decimalSeparator: string,
   dateFormat: string,
+  mode: ImportMode = "all",
 ): Promise<void> {
   numeral.locales["variant-import-locale"] = {
     delimiters: {
@@ -65,97 +125,33 @@ export async function verifyDataForImport(
   };
   numeral.locale("variant-import-locale");
 
-  // Verify products import
-  const csv1Rows = await parseCsvFile(fileStates.products, delimiter);
-  const csv1Columns = Object.keys(csv1Rows[0] || {});
-  const expectedColumns1 = COLUMNS_PER_CSV.products;
-  const missingColumns1 = expectedColumns1.filter(
-    (col) => !csv1Columns.includes(col),
-  );
-
-  if (missingColumns1.length > 0) {
-    throw new Error(
-      `Le fichier produits manque les colonnes suivantes : ${missingColumns1.join(", ")}`,
+  if (mode === "all" || mode === "products-variants") {
+    await validateCsvFile(
+      fileStates.products,
+      "products",
+      delimiter,
+      dateFormat,
+    );
+    await validateCsvFile(
+      fileStates.variants,
+      "variants",
+      delimiter,
+      dateFormat,
     );
   }
 
-  // Verify date formats in products CSV
-  const dateColumns1 = COLUMNS_PER_CSV_DATE_COLUMNS.products;
-  for (const dateCol of dateColumns1)
-    for (const row of csv1Rows) {
-      const dateValue = row[dateCol];
-      if (dateValue && !isMatch(dateValue, dateFormat)) {
-        throw new Error(
-          `Le format de la date dans la colonne "${dateCol}" est invalide : ${dateValue}`,
-        );
-      }
-    }
-
-  // Verify variants import
-  const csv2Rows = await parseCsvFile(fileStates.variants, delimiter);
-  const csv2Columns = Object.keys(csv2Rows[0] || {});
-  const expectedColumns2 = COLUMNS_PER_CSV.variants;
-  const missingColumns2 = expectedColumns2.filter(
-    (col) => !csv2Columns.includes(col),
-  );
-
-  if (missingColumns2.length > 0) {
-    throw new Error(
-      `Le fichier variantes manque les colonnes suivantes : ${missingColumns2.join(", ")}`,
+  if (mode === "all" || mode === "customers") {
+    await validateCsvFile(
+      fileStates.customers,
+      "customers",
+      delimiter,
+      dateFormat,
     );
   }
-
-  // Verify customers import
-  const csv3Rows = await parseCsvFile(fileStates.customers, delimiter);
-  const csv3Columns = Object.keys(csv3Rows[0] || {});
-  const expectedColumns3 = COLUMNS_PER_CSV.customers;
-  const missingColumns3 = expectedColumns3.filter(
-    (col) => !csv3Columns.includes(col),
-  );
-
-  if (missingColumns3.length > 0) {
-    throw new Error(
-      `Le fichier clients manque les colonnes suivantes : ${missingColumns3.join(", ")}`,
-    );
-  }
-
-  // Verify date formats in customers CSV
-  const dateColumns3 = COLUMNS_PER_CSV_DATE_COLUMNS.customers;
-  for (const dateCol of dateColumns3)
-    for (const row of csv3Rows) {
-      const dateValue = row[dateCol];
-      if (dateValue && !isMatch(dateValue, dateFormat)) {
-        throw new Error(
-          `Le format de la date dans la colonne "${dateCol}" est invalide : ${dateValue}`,
-        );
-      }
-    }
-
-  // Verify prices
-  const priceColumns1 = COLUMNS_PER_CSV_PRICE_COLUMNS.products;
-  for (const priceCol of priceColumns1)
-    for (const row of csv1Rows) {
-      const priceValue = row[priceCol];
-
-      if (priceValue && !isValidPrice(priceValue))
-        throw new Error(
-          `Le prix dans la colonne "${priceCol}" est invalide : ${priceValue}`,
-        );
-    }
-
-  const priceColumns2 = COLUMNS_PER_CSV_PRICE_COLUMNS.variants;
-  for (const priceCol of priceColumns2)
-    for (const row of csv2Rows) {
-      const priceValue = row[priceCol];
-
-      if (priceValue && !isValidPrice(priceValue))
-        throw new Error(
-          `Le prix dans la colonne "${priceCol}" est invalide : ${priceValue}`,
-        );
-    }
 }
 
 function isValidPrice(value: string): boolean {
   const normalizedValue = numeral(value).value();
+  if (normalizedValue === null) return false;
   return !isNaN(normalizedValue) && normalizedValue >= 0;
 }

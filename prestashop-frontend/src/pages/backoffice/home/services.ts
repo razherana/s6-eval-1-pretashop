@@ -74,6 +74,8 @@ export interface InputRefs {
   zip: React.RefObject<HTMLInputElement>;
 }
 
+export type ImportMode = "all" | "products-variants" | "customers" | "images";
+
 export async function parseCsvFile(
   file: File,
   delimiter: string,

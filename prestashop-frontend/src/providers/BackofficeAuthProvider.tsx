@@ -10,7 +10,7 @@ export function BackofficeAuthProvider({
   children,
 }: BackofficeAuthProviderProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState<{ id: number; name: string } | null>(() => {
+  const [user, setUser] = useState<{ id: number; name: string } | undefined>(() => {
     if (localStorage.getItem("user")) {
       setIsAuthenticated(true);
       return JSON.parse(localStorage.getItem("user")!);
@@ -40,7 +40,7 @@ export function BackofficeAuthProvider({
   const logout = () => {
 
     localStorage.removeItem("user");
-    setUser(null);
+    setUser(undefined);
     setIsAuthenticated(false);
   };
 

@@ -8,9 +8,19 @@ import { FileUploadStep } from "./FileUploadStep";
 import { ImportStatsSummary } from "./ImportStatsSummary";
 import { type ImportStep, type FileStates, type TotalStats, type InputRefs } from "../../services";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { ImportMode } from "../../services";
 
 interface ImportConfigurationViewProps {
   importSteps: ImportStep[];
+  importMode: ImportMode;
+  setImportMode: (mode: ImportMode) => void;
   fileStates: FileStates;
   delimiter: string;
   setDelimiter: (delimiter: string) => void;
@@ -38,6 +48,8 @@ interface ImportConfigurationViewProps {
 
 export function ImportConfigurationView({
   importSteps,
+  importMode,
+  setImportMode,
   fileStates,
   delimiter,
   setDelimiter,
@@ -71,7 +83,7 @@ export function ImportConfigurationView({
             Import Products Data
           </DialogTitle>
           <DialogDescription>
-            Upload your 3 CSV files (Products, Variants, Customers) and the ZIP archive of product images
+            Upload your CSV files and/or ZIP archive of product images.
           </DialogDescription>
         </DialogHeader>
       </div>
@@ -85,6 +97,34 @@ export function ImportConfigurationView({
             <AlertDescription>{bigError}</AlertDescription>
           </Alert>
         )}
+
+        {/* Import Mode Selector */}
+        <div className="space-y-2">
+          <Label htmlFor="import-mode">Import Mode</Label>
+          <Select
+            value={importMode}
+            onValueChange={(value) => setImportMode(value as ImportMode)}
+            disabled={isImporting}
+          >
+            <SelectTrigger id="import-mode" className="max-w-xs">
+              <SelectValue placeholder="Select import mode" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All files</SelectItem>
+              <SelectItem value="products-variants">
+                Fichier 1 (Products) &amp; Fichier 2 (Variants)
+              </SelectItem>
+              <SelectItem value="customers">Fichier 3 (Customers) only</SelectItem>
+              <SelectItem value="images">Images (ZIP) only</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {importMode === "products-variants" && "Only Products (Fichier 1) and Variants (Fichier 2) will be imported. Customers and Images are skipped."}
+            {importMode === "customers" && "Only Customers (Fichier 3) will be imported. Products, Variants, and Images are skipped."}
+            {importMode === "images" && "Only Images (ZIP) will be imported. Products, Variants, and Customers are skipped."}
+            {importMode === "all" && "All files (Products, Variants, Customers, Images) will be imported."}
+          </p>
+        </div>
 
         {/* Delimiter Configuration */}
         <div className="space-y-2">

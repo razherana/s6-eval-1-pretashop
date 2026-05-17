@@ -80,6 +80,7 @@ export async function createAddress(
   city: string,
   phone: string,
   countryId: number = COUNTRY_ID,
+  date_add? : string
 ): Promise<number> {
   const converter = new PrestaShopXMLConverter(addressSchema, "");
 
@@ -94,6 +95,7 @@ export async function createAddress(
     id_country: countryId.toString(),
     alias: "Delivery Address",
     postcode: "101",
+    date_add: date_add || new Date().toISOString().slice(0, 19).replace("T", " "),
   };
 
   const xmlData = converter.convertRowToXML(addressData);

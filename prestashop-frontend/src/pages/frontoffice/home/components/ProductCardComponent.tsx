@@ -359,7 +359,7 @@ export function ProductCardComponent({
             </div>
             <div className="flex items-center gap-1.5">
               {product.id_tax_rules_group !== undefined &&
-                product.id_tax_rules_group !== '' && (
+                product.id_tax_rules_group !== 0 && (
                   <Badge variant="secondary" className="text-xs">
                     Tax included
                   </Badge>

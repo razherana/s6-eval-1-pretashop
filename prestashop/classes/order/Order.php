@@ -1430,6 +1430,7 @@ class OrderCore extends ObjectModel
             if ($id_order_carrier) {
                 $order_carrier = new OrderCarrier((int) $id_order_carrier);
                 $order_carrier->id_order_invoice = (int) $order_invoice->id;
+                $order_carrier->date_add = $this->date_add;
                 $order_carrier->update();
             }
 
@@ -1549,6 +1550,8 @@ class OrderCore extends ObjectModel
             $order_invoice = new OrderInvoice();
             $order_invoice->id_order = $this->id;
             $order_invoice->number = 0;
+            file_put_contents('/tmp/debug.txt', 'Creating delivery slip for order ' . $this->id . "\n", FILE_APPEND);
+            $order_invoice->date_add = $this->date_add;
             $this->setInvoiceDetails($order_invoice);
             $this->delivery_date = $order_invoice->date_add;
             $this->delivery_number = $this->getDeliveryNumber($order_invoice->id);
@@ -1612,6 +1615,8 @@ class OrderCore extends ObjectModel
             // Set delivery number on invoice
             $order_invoice->delivery_number = 0;
             $order_invoice->delivery_date = date('Y-m-d H:i:s');
+            $order_invoice->date_add = $this->date_add;
+            
             // Update Order Invoice
             $order_invoice->update();
             $this->setDeliveryNumber($order_invoice->id, $this->id_shop);
@@ -1794,7 +1799,10 @@ class OrderCore extends ObjectModel
             $this->total_paid,
             $this->payment,
             null,
-            [],
+            [
+              'date_add' => $this->date_add,
+              'date_upd' => $this->date_upd,
+            ],
             null,
             false,
             $customer->secure_key

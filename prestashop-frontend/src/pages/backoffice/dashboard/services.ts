@@ -262,7 +262,7 @@ export async function fetchStockRowsForDashboard(
   await Promise.all(
     products.map(async (product) => {
       const stockInfo = await fetchProductStock(product.id);
-      const combinations = product.associations?.combinations?.combination
+      const combinations = assureArray(product.associations?.combinations?.combination)
         ?.length
         ? await fetchProductCombinations(product.id)
         : [];
