@@ -30,6 +30,12 @@ import {
   Boxes,
 } from "lucide-react";
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
   BarChart,
   Bar,
   XAxis,
@@ -46,9 +52,14 @@ import {
   getAllDailyStats,
   prepareChartData,
   fetchStockRowsForDashboard,
+  fetchCategoryStockRows,
   fetchStockMovements,
+  fetchVirtualMovementsForProduct,
+  fetchAndCalculateAllStats,
   type ProductStockRow,
+  type CategoryStockRow,
   type StockMovement,
+  type CategoryProfit,
 } from "./services";
 import type { OrderReadXML } from "@/pages/backoffice/home/types";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -57,6 +68,7 @@ import { LanguageLoadingComponent } from "@/components/ui-manual/language-loadin
 import { SelectLanguageCurrency } from "@/components/ui-manual/select-lang";
 import { utc } from "@date-fns/utc";
 import { StockHistoryDialog } from "./components/StockHistoryDialog";
+import { ResultsPagination } from "../home/components/import-data/ResultsPagination";
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -72,6 +84,41 @@ export function DashboardPage() {
   const [isStockHistoryOpen, setIsStockHistoryOpen] = useState(false);
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
   const [stockMovementsLoading, setStockMovementsLoading] = useState(false);
+
+  // Stock table search & pagination
+  const [stockSearch, setStockSearch] = useState("");
+  const [stockPage, setStockPage] = useState(1);
+  const stockPageSize = 10;
+  const [categoryStockRows, setCategoryStockRows] = useState<CategoryStockRow[]>([]);
+
+  const filteredStockRows = useMemo(() => {
+    if (!stockSearch.trim()) return stockRows;
+    const query = stockSearch.toLowerCase();
+    return stockRows.filter((row) => {
+      const productName = getWithLanguage(
+        row.productName,
+        language?.language_id ?? 1,
+      ).toLowerCase();
+      const combinationName = (row.combinationName || "").toLowerCase();
+      return (
+        productName.includes(query) || combinationName.includes(query)
+      );
+    });
+  }, [stockRows, stockSearch, language]);
+
+  const paginatedStockRows = useMemo(() => {
+    const start = (stockPage - 1) * stockPageSize;
+    return filteredStockRows.slice(start, start + stockPageSize);
+  }, [filteredStockRows, stockPage]);
+
+  // Total sales HT and total purchase cost
+  const [totalSalesHt, setTotalSalesHt] = useState<number>(0);
+  const [totalPurchase, setTotalPurchase] = useState<number>(0);
+  const [categoryProfits, setCategoryProfits] = useState<CategoryProfit[]>([]);
+
+  // Daily breakdown table pagination (page state only, memo defined after allDailyStats)
+  const [dailyPage, setDailyPage] = useState(1);
+  const dailyPageSize = 15;
 
   const formatCurrency = useCallback(
     (amount: number) => {
@@ -92,6 +139,13 @@ export function DashboardPage() {
     try {
       const ordersResult = await fetchAllOrdersForDashboard();
       setOrders(ordersResult);
+      setDailyPage(1);
+
+      // Calculate all dashboard stats with a single data fetch
+      const stats = await fetchAndCalculateAllStats(ordersResult);
+      setTotalSalesHt(stats.totalSalesHt);
+      setTotalPurchase(stats.totalPurchase);
+      setCategoryProfits(stats.categoryProfits);
     } catch (err) {
       console.error("Error loading dashboard data:", err);
       setError("Failed to load dashboard data");
@@ -118,6 +172,12 @@ export function DashboardPage() {
     [orders],
   );
 
+  // Paginated daily stats (must be after allDailyStats declaration)
+  const paginatedDailyStats = useMemo(() => {
+    const start = (dailyPage - 1) * dailyPageSize;
+    return allDailyStats.slice(start, start + dailyPageSize);
+  }, [allDailyStats, dailyPage]);
+
   const chartData = useMemo(
     () => prepareChartData(dashboardData.dailyStats),
     [dashboardData],
@@ -129,15 +189,32 @@ export function DashboardPage() {
     (async () => {
       setStockMovementsLoading(true);
       try {
-        const movements = await fetchStockMovements(selectedStockRow.stockId);
-        setStockMovements(movements);
+        const [physicalMovements, virtualMovements] = await Promise.all([
+          fetchStockMovements(selectedStockRow.stockId),
+          fetchVirtualMovementsForProduct(
+            selectedStockRow.productId,
+            selectedStockRow.combinationId,
+            selectedDate
+              ? format(selectedDate, "yyyy-MM-dd", { in: utc })
+              : null,
+          ),
+        ]);
+
+        console.log("Physical movements:", physicalMovements);
+        console.log("Virtual movements:", virtualMovements);
+
+        // Merge and sort by date
+        const allMovements = [...physicalMovements, ...virtualMovements].sort(
+          (a, b) => a.date_add.localeCompare(b.date_add),
+        );
+        setStockMovements(allMovements);
       } catch (err) {
         console.error("Error loading stock movements:", err);
       } finally {
         setStockMovementsLoading(false);
       }
     })();
-  }, [isStockHistoryOpen, selectedStockRow?.stockId]);
+  }, [isStockHistoryOpen, selectedStockRow?.stockId, selectedStockRow?.productId, selectedStockRow?.combinationId, selectedDate]);
 
   // Re-fetch stock rows when the selected date changes
   useEffect(() => {
@@ -147,8 +224,14 @@ export function DashboardPage() {
         const dateStr = selectedDate
           ? format(selectedDate, "yyyy-MM-dd", { in: utc })
           : null;
-        const rows = await fetchStockRowsForDashboard(dateStr);
+        const [rows, catRows] = await Promise.all([
+          fetchStockRowsForDashboard(dateStr),
+          fetchCategoryStockRows(dateStr),
+        ]);
         setStockRows(rows);
+        setCategoryStockRows(catRows);
+        setStockPage(1);
+        setStockSearch("");
         setStockError(null);
       } catch (err) {
         console.error("Error loading stock data:", err);
@@ -174,8 +257,8 @@ export function DashboardPage() {
           </div>
         </header>
         <main className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            {Array.from({ length: 4 }).map((_, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+            {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} className="h-32" />
             ))}
           </div>
@@ -268,7 +351,7 @@ export function DashboardPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
@@ -340,6 +423,40 @@ export function DashboardPage() {
               ) : (
                 <p className="text-3xl font-bold text-muted-foreground">-</p>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                <Euro className="h-4 w-4" />
+                Total Sales (HT)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-indigo-600">
+                {formatCurrency(totalSalesHt)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Total revenue (tax excl.)
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4" />
+                Total Purchase
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-rose-600">
+                {formatCurrency(totalPurchase)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Total purchase cost (wholesale)
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -460,10 +577,19 @@ export function DashboardPage() {
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="flex items-center gap-2">
               <Boxes className="h-5 w-5" />
-              Product Variants Stock
+              Stock
             </CardTitle>
             <div className="flex items-center gap-3">
-              <Label htmlFor="stock-history-date" className="text-sm font-medium">
+              <Input
+                placeholder="Search..."
+                value={stockSearch}
+                onChange={(e) => {
+                  setStockSearch(e.target.value);
+                  setStockPage(1);
+                }}
+                className="w-56"
+              />
+              <Label htmlFor="stock-history-date" className="text-sm font-medium whitespace-nowrap">
                 History up to:
               </Label>
               <Input
@@ -490,58 +616,143 @@ export function DashboardPage() {
               <div className="flex items-center justify-center py-8 text-destructive">
                 <p>{stockError}</p>
               </div>
-            ) : stockRows.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Combination</TableHead>
-                    <TableHead className="text-right">Ref.</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {stockRows.map((row) => (
-                    <TableRow
-                      key={`${row.productId}-${row.combinationId}`}
-                      className={row.stockId ? "cursor-pointer" : "opacity-60"}
-                      onClick={() => {
-                        if (!row.stockId) return;
-                        setSelectedStockRow(row);
-                        setIsStockHistoryOpen(true);
-                      }}
-                    >
-                      <TableCell className="font-medium">
-                        {getWithLanguage(row.productName, language.language_id)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-medium whitespace-pre-line text-xs leading-relaxed">
-                            {row.combinationName}
-                          </span>
-                          {row.combinationReference && (
-                            <span className="text-xs text-muted-foreground">
-                              {row.combinationReference}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {row.productReference || "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant={row.quantity > 0 ? "default" : "destructive"}>
-                          {row.quantity}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
             ) : (
-              <div className="flex items-center justify-center py-12 text-muted-foreground">
-                <p>No product combinations found</p>
-              </div>
+              <Tabs defaultValue="per-product">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="per-product">Per Product</TabsTrigger>
+                  <TabsTrigger value="by-category">By Category</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="per-product">
+                  {filteredStockRows.length > 0 ? (
+                    <>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Product</TableHead>
+                            <TableHead>Combination</TableHead>
+                            <TableHead className="text-right">Ref.</TableHead>
+                            <TableHead className="text-right">Physical</TableHead>
+                            <TableHead className="text-right">Reserved</TableHead>
+                            <TableHead className="text-right">Available</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedStockRows.map((row) => (
+                            <TableRow
+                              key={`${row.productId}-${row.combinationId}`}
+                              className={row.stockId ? "cursor-pointer" : "opacity-60"}
+                              onClick={() => {
+                                if (!row.stockId) return;
+                                setSelectedStockRow(row);
+                                setIsStockHistoryOpen(true);
+                              }}
+                            >
+                              <TableCell className="font-medium">
+                                {getWithLanguage(row.productName, language.language_id)}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="font-medium whitespace-pre-line text-xs leading-relaxed">
+                                    {row.combinationName}
+                                  </span>
+                                  {row.combinationReference && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {row.combinationReference}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {row.productReference || "-"}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Badge variant="secondary">
+                                  {row.physicalQuantity}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {row.virtualQuantity > 0 ? (
+                                  <Badge variant="outline" className="text-amber-600 border-amber-300">
+                                    {row.virtualQuantity}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">0</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Badge variant={row.quantity > 0 ? "default" : "destructive"}>
+                                  {row.quantity}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      <ResultsPagination
+                        currentPage={stockPage}
+                        totalPages={Math.ceil(filteredStockRows.length / stockPageSize)}
+                        startIndex={(stockPage - 1) * stockPageSize}
+                        endIndex={Math.min(stockPage * stockPageSize, filteredStockRows.length)}
+                        total={filteredStockRows.length}
+                        onPrevious={() => setStockPage((p) => Math.max(1, p - 1))}
+                        onNext={() => setStockPage((p) => Math.min(Math.ceil(filteredStockRows.length / stockPageSize), p + 1))}
+                      />
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center py-12 text-muted-foreground">
+                      <p>No product combinations found</p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="by-category">
+                  {categoryStockRows.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Category</TableHead>
+                          <TableHead className="text-right">Physical</TableHead>
+                          <TableHead className="text-right">Reserved</TableHead>
+                          <TableHead className="text-right">Available</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {categoryStockRows.map((row) => (
+                          <TableRow key={row.categoryId}>
+                            <TableCell className="font-medium">
+                              {row.categoryName}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">
+                                {row.physicalQuantity}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {row.virtualQuantity > 0 ? (
+                                <Badge variant="outline" className="text-amber-600 border-amber-300">
+                                  {row.virtualQuantity}
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">0</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant={row.quantity > 0 ? "default" : "destructive"}>
+                                {row.quantity}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="flex items-center justify-center py-12 text-muted-foreground">
+                      <p>No category stock data available</p>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             )}
           </CardContent>
         </Card>
@@ -559,68 +770,142 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             {allDailyStats.length > 0 ? (
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead className="text-right">Orders</TableHead>
+                      <TableHead className="text-right">Daily Revenue</TableHead>
+                      <TableHead className="text-right">Cumulative</TableHead>
+                      <TableHead className="text-right">Avg Order</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedDailyStats.map((day) => (
+                      <TableRow key={day.date}>
+                        <TableCell className="font-medium">
+                          {format(parseISO(day.date, { in: utc }), "dd MMMM yyyy", {
+                            locale: fr,
+                          })}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant="secondary">{day.orderCount}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(day.totalAmount)}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatCurrency(day.cumulativeAmount)}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatCurrency(day.totalAmount / day.orderCount)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {/* Grand Total Row */}
+                    <TableRow className="bg-muted/50 font-bold">
+                      <TableCell>Grand Total</TableCell>
+                      <TableCell className="text-right">
+                        <Badge>
+                          {allDailyStats.reduce((sum, d) => sum + d.orderCount, 0)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(
+                          allDailyStats.reduce((sum, d) => sum + d.totalAmount, 0),
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(
+                          allDailyStats.reduce((sum, d) => sum + d.totalAmount, 0),
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(
+                          allDailyStats.reduce((sum, d) => sum + d.totalAmount, 0) /
+                          allDailyStats.reduce((sum, d) => sum + d.orderCount, 0),
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+                <ResultsPagination
+                  currentPage={dailyPage}
+                  totalPages={Math.ceil(allDailyStats.length / dailyPageSize)}
+                  startIndex={(dailyPage - 1) * dailyPageSize}
+                  endIndex={Math.min(dailyPage * dailyPageSize, allDailyStats.length)}
+                  total={allDailyStats.length}
+                  onPrevious={() => setDailyPage((p) => Math.max(1, p - 1))}
+                  onNext={() => setDailyPage((p) => Math.min(Math.ceil(allDailyStats.length / dailyPageSize), p + 1))}
+                />
+              </>
+            ) : (
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <p>No orders found</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Profit by Category Table */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Profit by Category
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {categoryProfits.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
+                    <TableHead>Category</TableHead>
                     <TableHead className="text-right">Orders</TableHead>
-                    <TableHead className="text-right">Daily Revenue</TableHead>
-                    <TableHead className="text-right">Cumulative</TableHead>
-                    <TableHead className="text-right">Avg Order</TableHead>
+                    <TableHead className="text-right">Sales (HT)</TableHead>
+                    <TableHead className="text-right">Cost</TableHead>
+                    <TableHead className="text-right">Profit</TableHead>
+                    <TableHead className="text-right">Margin</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {allDailyStats.map((day) => (
-                    <TableRow key={day.date}>
-                      <TableCell className="font-medium">
-                        {format(parseISO(day.date, { in: utc }), "dd MMMM yyyy", {
-                          locale: fr,
-                        })}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant="secondary">{day.orderCount}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(day.totalAmount)}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {formatCurrency(day.cumulativeAmount)}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {formatCurrency(day.totalAmount / day.orderCount)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {/* Grand Total Row */}
-                  <TableRow className="bg-muted/50 font-bold">
-                    <TableCell>Grand Total</TableCell>
-                    <TableCell className="text-right">
-                      <Badge>
-                        {allDailyStats.reduce((sum, d) => sum + d.orderCount, 0)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(
-                        allDailyStats.reduce((sum, d) => sum + d.totalAmount, 0),
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(
-                        allDailyStats.reduce((sum, d) => sum + d.totalAmount, 0),
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(
-                        allDailyStats.reduce((sum, d) => sum + d.totalAmount, 0) /
-                        allDailyStats.reduce((sum, d) => sum + d.orderCount, 0),
-                      )}
-                    </TableCell>
-                  </TableRow>
+                  {categoryProfits.map((cat) => {
+                    const margin = cat.totalSales > 0
+                      ? ((cat.totalProfit / cat.totalSales) * 100).toFixed(1)
+                      : "-";
+                    return (
+                      <TableRow key={cat.categoryId}>
+                        <TableCell className="font-medium">
+                          {cat.categoryName}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant="secondary">{cat.orderCount}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(cat.totalSales)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(cat.totalCost)}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          <span className={cat.totalProfit >= 0 ? "text-green-600" : "text-red-600"}>
+                            {formatCurrency(cat.totalProfit)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant={cat.totalProfit >= 0 ? "default" : "destructive"}>
+                            {margin}%
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             ) : (
               <div className="flex items-center justify-center py-12 text-muted-foreground">
-                <p>No orders found</p>
+                <p>No category profit data available</p>
               </div>
             )}
           </CardContent>

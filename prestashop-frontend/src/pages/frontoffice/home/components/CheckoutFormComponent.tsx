@@ -30,9 +30,9 @@ export function CheckoutFormComponent() {
   );
 
   const [formData, setFormData] = useState<CustomerFormData>({
-    address: '',
-    city: '',
-    phone: '',
+    address: 'Rue 123',
+    city: 'Paris',
+    phone: '0342758913',
   });
 
   const [loading, setLoading] = useState(false);

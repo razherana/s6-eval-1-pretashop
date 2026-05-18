@@ -313,6 +313,8 @@ class StockMovementRepository extends StockManagementRepository
         $this->em->persist($stockMvt);
         $this->em->flush();
 
+        file_put_contents('/tmp/debug.txt', '[Info] : Stock movement saved with ID: ' . $stockMvt->getIdStockMvt() . "\n", FILE_APPEND);
+
         return $stockMvt->getIdStockMvt();
     }
 

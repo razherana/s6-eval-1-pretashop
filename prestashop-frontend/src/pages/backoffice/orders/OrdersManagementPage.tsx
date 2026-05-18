@@ -8,7 +8,9 @@ import {
   fetchAllOrderStates,
   fetchOrderDetailsById,
   fetchCartDetails, // New import
-  processDeliveryAndPayment,
+  processPayment,
+  processDelivery,
+  processCancel,
 } from "./services/orderServices";
 import { LanguageLoadingComponent } from "@/components/ui-manual/language-loading-state";
 import { Button } from "@/components/ui/button";
@@ -67,10 +69,11 @@ import {
   type LucideProps,
   CheckCheck,
   ShoppingCart,
+  X,
 } from "lucide-react";
 import { getFormattedPrice, getWithLanguage } from "@/utils/lang";
 import { toast } from "sonner";
-import type { OrderReadXML, OrderDetailReadXML, OrderStateXML } from "@/pages/backoffice/home/types";
+import { type OrderReadXML, type OrderDetailReadXML, type OrderStateXML, ORDER_STATES } from "@/pages/backoffice/home/types";
 import { SelectLanguageCurrency } from "@/components/ui-manual/select-lang";
 import { updateOrderState } from "../home/import-services/customer-import";
 import { format } from "date-fns";
@@ -89,17 +92,55 @@ export function OrdersManagementPage() {
   // State for processing
   const [_, setProcessingOrder] = useState(false);
 
-  // Add handler function
-  const handleDeliverAndPay = async (order: OrderReadXML) => {
+  // Handler for Pay only (awaiting payment)
+  const handlePay = async (order: OrderReadXML) => {
     setProcessingOrder(true);
     try {
-      await processDeliveryAndPayment(order, language);
+      await processPayment(order, language);
 
       // Reload orders
       const ordersData = await fetchAllOrdersWithCarts(100);
       setOrders(ordersData);
+      toast.success("Payment processed successfully");
+    } catch (error) {
+      console.error("Error processing payment:", error);
+      toast.error("Failed to process payment");
+    } finally {
+      setProcessingOrder(false);
+    }
+  };
+
+  // Handler for Deliver only (already paid)
+  const handleDeliver = async (order: OrderReadXML) => {
+    setProcessingOrder(true);
+    try {
+      await processDelivery(order);
+
+      // Reload orders
+      const ordersData = await fetchAllOrdersWithCarts(100);
+      setOrders(ordersData);
+      toast.success("Delivery processed successfully");
     } catch (error) {
       console.error("Error processing delivery:", error);
+      toast.error("Failed to process delivery");
+    } finally {
+      setProcessingOrder(false);
+    }
+  };
+
+  const handleCancel = async (order: OrderReadXML) => {
+    setProcessingOrder(true);
+  
+    try {
+      await processCancel(order);
+
+      // Reload orders
+      const ordersData = await fetchAllOrdersWithCarts(100);
+      setOrders(ordersData);
+      toast.success("Cancelation processed successfully");
+    } catch (error) {
+      console.error("Error processing cancelation:", error);
+      toast.error("Failed to process cancelation");
     } finally {
       setProcessingOrder(false);
     }
@@ -436,20 +477,60 @@ export function OrdersManagementPage() {
                                   Change State
                                 </DropdownMenuItem>
 
-                                {/* Show Deliver & Pay only for awaiting orders */}
+                                {/* Show Pay for awaiting payment orders */}
                                 {(() => {
                                   const stateId = order.current_state["#text"];
 
-                                  // Show for awaiting payment states (1, 10, 13, 14)
-                                  if ([1, 10, 13, 14].includes(stateId)) {
+                                  if (([
+                                    ORDER_STATES.AWAITING_CASH_ON_DELIVERY,
+                                    ORDER_STATES.PAYMENT_ERROR,
+                                  ] as number[]).includes(stateId)) {
                                     return (
-                                      <DropdownMenuItem
-                                        onClick={() => handleDeliverAndPay(order)}
-                                        className="text-green-600 focus:text-green-600"
-                                      >
-                                        <CheckCheck className="mr-2 h-4 w-4" />
-                                        Deliver & Pay
-                                      </DropdownMenuItem>
+                                      <>
+                                        <DropdownMenuItem
+                                          onClick={() => handlePay(order)}
+                                          className="text-green-600 focus:text-green-600"
+                                        >
+                                          <CheckCheck className="mr-2 h-4 w-4" />
+                                          Pay
+                                        </DropdownMenuItem>
+
+                                        <DropdownMenuItem
+                                          onClick={() => handleCancel(order)}
+                                          className="text-red-600 focus:text-red-600"
+                                        >
+                                          <X className="mr-2 h-4 w-4" />
+                                          Cancel
+                                        </DropdownMenuItem>
+                                      </>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+
+                                {/* Show Deliver for paid orders */}
+                                {(() => {
+                                  const stateId = order.current_state["#text"];
+
+                                  if (stateId === ORDER_STATES.PAYMENT_ACCEPTED) {
+                                    return (
+                                      <>
+                                        <DropdownMenuItem
+                                          onClick={() => handleDeliver(order)}
+                                          className="text-blue-600 focus:text-blue-600"
+                                        >
+                                          <Truck className="mr-2 h-4 w-4" />
+                                          Deliver
+                                        </DropdownMenuItem>
+
+                                        <DropdownMenuItem
+                                          onClick={() => handleCancel(order)}
+                                          className="text-red-600 focus:text-red-600"
+                                        >
+                                          <X className="mr-2 h-4 w-4" />
+                                          Cancel
+                                        </DropdownMenuItem>
+                                      </>
                                     );
                                   }
                                   return null;

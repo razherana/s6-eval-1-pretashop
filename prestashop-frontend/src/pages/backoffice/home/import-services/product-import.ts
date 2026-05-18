@@ -249,7 +249,7 @@ async function ensureTaxesExist(
         taxRuleIds[countryId.toString()] = taxRuleId;
       }
 
-      taxMap[cleanPercentage] = {
+      taxMap[cleanPercentageStr] = {
         taxId,
         taxRuleGroupId,
         taxRuleIds,
@@ -354,7 +354,7 @@ export async function importProductsFromFile(
         ? (numeral(row.Taxe.replace("%", "").trim()).value() ?? 0).toFixed(
             TAX_PRECISION,
           )
-        : "0";
+        : (0).toFixed(TAX_PRECISION);
 
       // Map CSV fields to schema fields
       const productData: Record<string, string> = {

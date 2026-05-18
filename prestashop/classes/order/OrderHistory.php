@@ -96,8 +96,6 @@ class OrderHistoryCore extends ObjectModel
         }
 
         // Log loaded order date_add
-        file_put_contents('/tmp/debug.txt', 'Order date_add: ' . $order->date_add . "\n", FILE_APPEND);
-
         ShopUrl::cacheMainDomainForShop($order->id_shop);
 
         $new_os = new OrderState((int) $new_order_state, $order->id_lang);
@@ -334,8 +332,15 @@ class OrderHistoryCore extends ObjectModel
                 // Save movement if :
                 // not Configuration::get('PS_ADVANCED_STOCK_MANAGEMENT')
                 // new_os->shipped != old_os->shipped
+
+                // Log the condition
+                file_put_contents('/tmp/debug.txt', '[Shipped] : Product ID: ' . $product['product_id'] . ' - Product Attribute ID: ' . $product['product_attribute_id'] . ' - New OS Shipped: ' . $new_os->shipped . ' - Old OS Shipped: ' . ($old_os->shipped ?? 'N/A') . "\n", FILE_APPEND);
+
                 if (Validate::isLoadedObject($old_os) && Validate::isLoadedObject($new_os) && $new_os->shipped != $old_os->shipped && !Configuration::get('PS_ADVANCED_STOCK_MANAGEMENT')) {
                     $product_quantity = (int) ($product['product_quantity'] - $product['product_quantity_refunded'] - $product['product_quantity_return']);
+
+                    // Enter here
+                    file_put_contents('/tmp/debug.txt', 'Product ID: ' . $product['product_id'] . ' - Product Attribute ID: ' . $product['product_attribute_id'] . ' - Product Quantity: ' . $product_quantity . "\n", FILE_APPEND);
 
                     if ($product_quantity > 0) {
                         $current_shop_context_type = Context::getContext()->shop->getContextType();
@@ -351,6 +356,7 @@ class OrderHistoryCore extends ObjectModel
                             [
                                 'id_order' => $order->id,
                                 'id_stock_mvt_reason' => ($new_os->shipped == 1 ? Configuration::get('PS_STOCK_CUSTOMER_ORDER_REASON') : Configuration::get('PS_STOCK_CUSTOMER_ORDER_CANCEL_REASON')),
+                                'date_add' => $this->date_add,
                             ]
                         );
                         //back to current shop context
@@ -397,6 +403,7 @@ class OrderHistoryCore extends ObjectModel
                     $payment->amount = $rest_paid;
                     $payment->payment_method = isset($payment_method) && $payment_method instanceof Module ? $payment_method->displayName : null;
                     $payment->conversion_rate = $order->conversion_rate;
+                    $payment->date_add = $this->date_add;
                     $payment->save();
 
                     // Update total_paid_real value for backward compatibility reasons

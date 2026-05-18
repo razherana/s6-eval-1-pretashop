@@ -7,7 +7,7 @@ import { fetchFromPrestashopApi } from "@/utils/url";
 import { PrestaShopXMLConverter } from "@/utils/xml";
 import { assureArray } from "@/utils/xml";
 import { utc } from "@date-fns/utc/utc";
-import { parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 
 const EMPLOYEE_ID_STOCK_MVT_REASON = 1; // Employee id 1 used
@@ -83,7 +83,8 @@ export async function updateStockQuantity(
   language: LanguageData,
   isMovement: boolean,
   name: string = "Manual adjustment",
-  dateAdd: string = new Date().toISOString().slice(0, 19).replace("T", " "),
+  dateAdd: string = format(new Date(), "yyyy-MM-dd HH:mm:ss", { in: utc }),
+  generateMovement: boolean = true,
 ): Promise<void> {
   const converter = new PrestaShopXMLConverter(stockAvailableSchema, "");
 
@@ -113,6 +114,8 @@ export async function updateStockQuantity(
         body: xmlData,
       },
     );
+
+    if (!generateMovement) return;
 
     // Add stock_movements entry
     const reasonConverter = new PrestaShopXMLConverter(
@@ -206,7 +209,7 @@ export async function fetchStockAtDate(
   try {
     const response = await fetchFromPrestashopApi<{
       stock_mvts: {
-        stock_mvt?: Array<{
+        stock_mvt: Array<{
           id: number;
           sign: number;
           physical_quantity: number;
@@ -215,15 +218,13 @@ export async function fetchStockAtDate(
       };
     }>(`/stock_movements?${query.toString()}`, { method: "GET" });
 
-    const movements = assureArray(response.stock_mvts?.stock_mvt) as Array<{
-      id: number;
-      sign: number;
-      physical_quantity: number;
-      date_add: string;
-    }>;
+    const movements = assureArray(response.stock_mvts?.stock_mvt);
 
     // Filter manually
-    const filtered = movements.filter((m) => parseISO(m.date_add, { in: utc }) >= parseISO(dateMax, { in: utc }));
+    const filtered = movements.filter(
+      (m) =>
+        parseISO(m.date_add, { in: utc }) >= parseISO(dateMax, { in: utc }),
+    );
 
     // Sort by date ascending
     const sorted = filtered.sort((a, b) =>

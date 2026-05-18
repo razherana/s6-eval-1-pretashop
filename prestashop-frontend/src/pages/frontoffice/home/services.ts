@@ -32,8 +32,7 @@ export async function fetchFilteredProducts(
   const offset = (page - 1) * limit;
   const query = new URLSearchParams({
     display: "full",
-    limit: limit.toString(),
-    offset: offset.toString(),
+    limit: `${offset},${limit}`,
     "price[price_ttc][use_tax]": "1",
   });
 
@@ -141,9 +140,9 @@ async function filterWithCombinations(
   // Fetch all combinations for these products in parallel
   const combinationChecks = products.map(async (product) => {
     try {
-      const combinationIds = assureArray(product.associations.combinations.combination).map(
-        (c) => c.id,
-      );
+      const combinationIds = assureArray(
+        product.associations.combinations.combination,
+      ).map((c) => c.id);
 
       if (combinationIds.length === 0) {
         // No combinations, just check base price
@@ -310,6 +309,7 @@ async function fetchAllCategories(): Promise<CategoryReadXML[]> {
 export async function fetchProductCombinations(
   productId: number,
   cache?: Map<number, CombinationDetailXML[]>,
+  useTax: boolean = true,
 ): Promise<CombinationDetailXML[]> {
   // Check cache first
   if (cache?.has(productId)) {
@@ -319,8 +319,10 @@ export async function fetchProductCombinations(
   const query = new URLSearchParams({
     display: "full",
     "filter[id_product]": productId.toString(),
-    "price[combination][use_tax]": "1",
   });
+
+  if(useTax) 
+    query.append("price[combination][use_tax]", "1");
 
   try {
     const response = await fetchFromPrestashopApi<{

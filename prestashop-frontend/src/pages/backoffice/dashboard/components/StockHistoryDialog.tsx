@@ -112,8 +112,8 @@ export function StockHistoryDialog({
     () =>
       selectedStockRow
         ? computeStockLevelChartData(
-          selectedStockRow.quantity,
-          stockMovements,
+          selectedStockRow.physicalQuantity,
+          stockMovements.filter((m) => m.type === "physical"),
         )
         : [],
     [selectedStockRow, stockMovements],
@@ -147,7 +147,7 @@ export function StockHistoryDialog({
             {/* Stock Level Chart */}
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                Stock level over time
+                Physical Stock level over time
               </h3>
               {stockLevelChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={280}>
@@ -202,9 +202,17 @@ export function StockHistoryDialog({
                 </div>
               )}
               {selectedStockRow && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Current stock: <strong>{selectedStockRow.quantity}</strong>
-                </p>
+                <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
+                  <span>
+                    Physical: <strong>{selectedStockRow.physicalQuantity}</strong>
+                  </span>
+                  <span className={selectedStockRow.virtualQuantity > 0 ? "text-amber-600" : ""}>
+                    Reserved: <strong>{selectedStockRow.virtualQuantity}</strong>
+                  </span>
+                  <span>
+                    Available: <strong>{selectedStockRow.quantity}</strong>
+                  </span>
+                </div>
               )}
             </div>
 
@@ -225,6 +233,7 @@ export function StockHistoryDialog({
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
                       <TableHead className="text-right">Sign</TableHead>
                       <TableHead className="text-right">Quantity</TableHead>
                     </TableRow>
@@ -241,6 +250,24 @@ export function StockHistoryDialog({
                             "dd MMMM yyyy",
                             { locale: fr },
                           )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              movement.type === "physical"
+                                ? "secondary"
+                                : "outline"
+                            }
+                            className={
+                              movement.type === "reserved"
+                                ? "text-amber-600 border-amber-300"
+                                : ""
+                            }
+                          >
+                            {movement.type === "physical"
+                              ? "Physical"
+                              : "Reserved"}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <Badge

@@ -1,6 +1,10 @@
 // src/pages/backoffice/home/import-services/customer-import.ts
 import { fetchFromPrestashopApi } from "@/utils/url";
-import { assureArray, PrestaShopXMLConverter, type MaybeArray } from "@/utils/xml";
+import {
+  assureArray,
+  PrestaShopXMLConverter,
+  type MaybeArray,
+} from "@/utils/xml";
 import {
   type ImportResult,
   type ImportedRow,
@@ -13,7 +17,6 @@ import { orderSchema } from "@/schemas/order";
 import { addressSchema } from "@/schemas/address";
 import { orderHistorySchema } from "@/schemas/orderHistory";
 import { orderPaymentSchema } from "@/schemas/orderPayment";
-import { updateStockQuantity } from "../services/stockServices";
 import { toast } from "sonner";
 import {
   getCombinationPrice,
@@ -31,6 +34,7 @@ import {
 import { format, parse } from "date-fns";
 import { utc } from "@date-fns/utc";
 import type { LanguageData } from "@/contexts/LanguageContext";
+import { updateStockQuantity } from "../services/stockServices";
 
 const USER_GROUP_ACCESS = [1, 2, 3];
 const COUNTRY_ID = 8;
@@ -651,6 +655,27 @@ function getOrderFlow(status: string): {
     };
   }
 
+  if (
+    statusLower === "expédié" ||
+    statusLower === "expedie" ||
+    statusLower === "expédiée" ||
+    statusLower === "expediee"
+  ) {
+    return {
+      stateId: ORDER_STATES.SHIPPED,
+    };
+  }
+
+  if (
+    statusLower === "livré" ||
+    statusLower === "livree" ||
+    statusLower === "livrée"
+  ) {
+    return {
+      stateId: ORDER_STATES.DELIVERED,
+    };
+  }
+
   // Default: awaiting payment
   return {
     stateId: ORDER_STATES.AWAITING_CASH_ON_DELIVERY,
@@ -660,54 +685,38 @@ function getOrderFlow(status: string): {
 // Process complete order flow (shipped -> delivered -> payment)
 export async function processCompleteOrderFlow(
   orderId: number,
-  orderReference: string,
-  totalAmount: number,
   date_add: string,
   languageData: LanguageData,
-  deleteGeneratedPayments: boolean = true,
+  stopAt: number = ORDER_STATES.PAYMENT_ACCEPTED,
+  orderDetails?: Array<{
+    product_id: { "#text": number };
+    product_attribute_id: { "#text": number };
+    product_quantity: number;
+  }>,
 ): Promise<void> {
-  // Remove from stock
-  await removeStock(orderId, languageData, date_add);
-
   await new Promise((resolve) => setTimeout(resolve, 300));
-  const orderPayment = await addOrderPayment(
-    orderId,
-    orderReference,
-    totalAmount,
-    date_add,
-    "Cash On Delivery",
-  );
 
   // This will create 2 order payments, so we need to delete those two and keep only one with the correct date
   await updateOrderState(orderId, ORDER_STATES.PAYMENT_ACCEPTED, date_add);
 
+  if (stopAt === ORDER_STATES.PAYMENT_ACCEPTED) return;
+
   await new Promise((resolve) => setTimeout(resolve, 300));
   await updateOrderState(orderId, ORDER_STATES.SHIPPED, date_add);
+
+  // Remove from stock using provided details if available, otherwise fetch them
+  if (orderDetails) {
+    await processStockRemovalFromDetails(orderDetails, languageData, date_add);
+  } else {
+    await removeStock(orderId, languageData, date_add);
+  }
+
+  if (stopAt === ORDER_STATES.SHIPPED) return;
 
   await new Promise((resolve) => setTimeout(resolve, 300));
   await updateOrderState(orderId, ORDER_STATES.DELIVERED, date_add);
 
-  if (deleteGeneratedPayments) {
-    // Get all payments id for the order and filter idOrderPayment.id !== orderPayment.id
-    const paymentsResponse = await fetchFromPrestashopApi<{
-      order_payments: {
-        order_payment: OrderPaymentXML[] | OrderPaymentXML;
-      };
-    }>(
-      `/order_payments?filter[order_reference]=${orderReference}&display=[id]`,
-      {
-        method: "GET",
-      },
-    );
-
-    const payments = assureArray(paymentsResponse.order_payments.order_payment);
-
-    for (const payment of payments)
-      if (payment.id !== orderPayment.id)
-        await fetchFromPrestashopApi(`/order_payments/${payment.id}`, {
-          method: "DELETE",
-        });
-  }
+  if (stopAt === ORDER_STATES.DELIVERED) return;
 }
 
 // Main import function
@@ -924,6 +933,15 @@ export async function importCustomersFromFile(
             }
 
             if (cartItems.length > 0) {
+              // Prepare order details for stock removal (no API calls needed)
+              const orderDetailsData = cartItems.map((i) => ({
+                product_id: { "#text": i.productId },
+                product_attribute_id: {
+                  "#text": i.combinationId || 0,
+                },
+                product_quantity: i.quantity,
+              }));
+
               // Calculate totals
               const totalAmount = cartItems.reduce(
                 (sum, item) => sum + item.price * item.quantity,
@@ -989,21 +1007,56 @@ export async function importCustomersFromFile(
               // Handle order flow based on status
               switch (stateId) {
                 case ORDER_STATES.CANCELED:
+                  // For canceled orders, we need to update stock
                   await updateOrderState(
                     order.id,
                     ORDER_STATES.CANCELED,
                     date_add_str,
                   );
+
+                  // Remove from stock with pre-fetched details (no extra API call)
+                  await processStockRemovalFromDetails(
+                    orderDetailsData,
+                    languageData,
+                    date_add_str,
+                  );
+
                   console.log(`Order #${order.reference} canceled`);
+                  break;
+
+                case ORDER_STATES.SHIPPED:
+                  await processCompleteOrderFlow(
+                    order.id,
+                    date_add_str,
+                    languageData,
+                    ORDER_STATES.SHIPPED,
+                    orderDetailsData,
+                  );
+                  console.log(
+                    `Order #${order.reference} completed with shipping`,
+                  );
+                  break;
+
+                case ORDER_STATES.DELIVERED:
+                  await processCompleteOrderFlow(
+                    order.id,
+                    date_add_str,
+                    languageData,
+                    ORDER_STATES.DELIVERED,
+                    orderDetailsData,
+                  );
+                  console.log(
+                    `Order #${order.reference} completed with delivery`,
+                  );
                   break;
 
                 case ORDER_STATES.PAYMENT_ACCEPTED:
                   await processCompleteOrderFlow(
                     order.id,
-                    order.reference,
-                    totalAmountWt,
                     date_add_str,
                     languageData,
+                    ORDER_STATES.PAYMENT_ACCEPTED,
+                    orderDetailsData,
                   );
                   console.log(
                     `Order #${order.reference} completed with payment`,
@@ -1083,11 +1136,13 @@ export async function importCustomersFromFile(
     };
   }
 }
+
 // Decrease stock quantities for all products in an order
 async function removeStock(
   orderId: number,
   languageData: LanguageData,
   dateAdd: string,
+  addMovement: boolean = false,
 ): Promise<void> {
   // 1. Fetch order details
   const detailsResponse = await fetchFromPrestashopApi<{
@@ -1120,7 +1175,29 @@ async function removeStock(
     return;
   }
 
-  // 2. For each product in the order, find and update stock
+  // 2. Process stock removal for each detail line
+  await processStockRemovalFromDetails(
+    details,
+    languageData,
+    dateAdd,
+    addMovement,
+  );
+}
+
+/**
+ * Process stock removal using pre-fetched order details.
+ * Makes API calls to look up stock_availables and update stock quantities.
+ */
+export async function processStockRemovalFromDetails(
+  details: Array<{
+    product_id: { "#text": number };
+    product_attribute_id: { "#text": number };
+    product_quantity: number;
+  }>,
+  languageData: LanguageData,
+  dateAdd: string,
+  addMovement: boolean = false,
+): Promise<void> {
   for (const detail of details) {
     const productId = detail.product_id["#text"];
     const attributeId = detail.product_attribute_id["#text"];
@@ -1133,11 +1210,7 @@ async function removeStock(
     });
 
     // If there's a specific attribute, filter by it; otherwise get default stock
-    if (attributeId !== 0) {
-      stockQuery.append("filter[id_product_attribute]", attributeId.toString());
-    } else {
-      stockQuery.append("filter[id_product_attribute]", "0");
-    }
+    stockQuery.append("filter[id_product_attribute]", attributeId.toString());
 
     try {
       const stockResponse = await fetchFromPrestashopApi<{
@@ -1173,6 +1246,7 @@ async function removeStock(
         true, // isMovement
         "Order stock removal",
         dateAdd,
+        addMovement,
       );
 
       console.log(
@@ -1184,5 +1258,33 @@ async function removeStock(
         error,
       );
     }
+  }
+}
+
+/**
+ * Process stock removal using pre-fetched stock availables (no API calls for fetching).
+ * Accepts an array of stock updates to apply.
+ */
+export async function processStockRemovalFromData(
+  stockUpdates: Array<{
+    stockId: number;
+    oldQuantity: number;
+    deltaQuantity: number;
+  }>,
+  languageData: LanguageData,
+  dateAdd: string,
+  addMovement: boolean = false,
+): Promise<void> {
+  for (const update of stockUpdates) {
+    await updateStockQuantity(
+      update.stockId,
+      update.oldQuantity,
+      -update.deltaQuantity,
+      languageData,
+      true,
+      "Order stock removal",
+      dateAdd,
+      addMovement,
+    );
   }
 }

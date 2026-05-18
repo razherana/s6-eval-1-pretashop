@@ -4,12 +4,19 @@ import {
   type OrderReadXML,
   type OrderDetailReadXML,
   type OrderStateXML,
+  ORDER_STATES,
 } from "../../home/types";
-import { processCompleteOrderFlow } from "../../home/import-services/customer-import";
-import { assureArray } from "@/utils/xml";
+import {
+  processCompleteOrderFlow,
+  updateOrderState,
+} from "../../home/import-services/customer-import";
+import { assureArray, PrestaShopXMLConverter } from "@/utils/xml";
+import { orderSlipSchema } from "@/schemas/orderSlip";
 import { toast } from "sonner";
 import { getCartTotal } from "@/pages/frontoffice/home/services/orderService";
 import type { LanguageData } from "@/utils/lang";
+import { format } from "date-fns";
+import { utc } from "@date-fns/utc";
 
 export interface UserCart {
   id: number;
@@ -107,6 +114,16 @@ export async function cartToOrderDisplay(
     date_add: cart.date_add,
     total_products_wt: prices.total_wt,
     total_products: prices.total,
+
+    conversion_rate: 1,
+    total_shipping_tax_incl: 0,
+    total_shipping_tax_excl: 0,
+
+    associations: {
+      order_rows: {
+        order_row: [],
+      },
+    },
   };
 }
 
@@ -306,10 +323,122 @@ export async function processDeliveryAndPayment(
 
   await processCompleteOrderFlow(
     order.id,
-    order.reference,
-    order.total_paid_tax_incl,
     new Date().toISOString().slice(0, 19).replace("T", " "),
     languageData,
-    true
+    ORDER_STATES.DELIVERED,
+  );
+}
+
+// Process only payment for an order (stops at PAYMENT_ACCEPTED)
+export async function processPayment(
+  order: OrderReadXML,
+  languageData: LanguageData,
+): Promise<void> {
+  if (order.reference?.startsWith("CART-")) {
+    toast.error("Cannot process a cart. Create an order first.");
+    return;
+  }
+
+  await processCompleteOrderFlow(
+    order.id,
+    new Date().toISOString().slice(0, 19).replace("T", " "),
+    languageData,
+    ORDER_STATES.PAYMENT_ACCEPTED,
+  );
+}
+
+// Process delivery for an order that has already been paid (starts from SHIPPED, ends at DELIVERED)
+export async function processDelivery(order: OrderReadXML): Promise<void> {
+  if (order.reference?.startsWith("CART-")) {
+    toast.error("Cannot process a cart. Create an order first.");
+    return;
+  }
+
+  await updateOrderState(
+    order.id,
+    ORDER_STATES.DELIVERED,
+    format(new Date(), "yyyy-MM-dd HH:mm:ss", { in: utc }),
+  );
+}
+
+export async function processCancel(order: OrderReadXML): Promise<void> {
+  if (order.reference?.startsWith("CART-")) {
+    toast.error("Cannot cancel a cart. Create an order first.");
+    return;
+  }
+
+  // If paid, create a refund (order slip) before canceling
+  if (order.current_state?.["#text"] === ORDER_STATES.PAYMENT_ACCEPTED) {
+    // Fetch full order data to get conversion_rate and shipping info
+    const orderResponse = await fetchFromPrestashopApi<{
+      order: OrderReadXML;
+    }>(
+      `/orders/${order.id}?display=full`,
+      { method: "GET" },
+    );
+
+    const orderData = orderResponse.order;
+    const conversionRate = orderData.conversion_rate || 1;
+
+    // Serialize order rows for the association transform
+    const orderRows = assureArray(order.associations.order_rows.order_row);
+    const orderRowsJson = JSON.stringify(
+      orderRows.map((row) => ({
+        id: row.id,
+        product_quantity: row.product_quantity,
+        unit_price_tax_incl: row.unit_price_tax_incl,
+      })),
+    );
+
+    const now = format(new Date(), "yyyy-MM-dd HH:mm:ss", { in: utc });
+
+    // Build the data map matching the schema fields
+    const rowData: Record<string, string> = {
+      id_customer:
+        order.id_customer?.["#text"]?.toString() || "",
+      id_order: order.id.toString(),
+      conversion_rate: conversionRate.toFixed(6),
+      total_products_tax_excl: (
+        orderData.total_products || 0
+      ).toFixed(6),
+      total_products_tax_incl: (
+        orderData.total_products_wt || 0
+      ).toFixed(6),
+      total_shipping_tax_excl:
+        orderData.total_shipping_tax_excl.toFixed(6),
+      total_shipping_tax_incl:
+        orderData.total_shipping_tax_incl.toFixed(6),
+      amount: (orderData.total_paid || 0).toFixed(6),
+      shipping_cost: "0",
+      partial: "0",
+      order_slip_type: "0",
+      date_add: now,
+      date_upd: now,
+      order_rows_json: orderRowsJson,
+    };
+
+    // Use the schema-based converter to build the XML
+    const converter = new PrestaShopXMLConverter(
+      orderSlipSchema,
+      "",
+    );
+    const xmlData = converter.convertRowToXML(rowData);
+    console.log("Order Slip XML:", xmlData);
+
+    // Post the order slip to create the refund
+    await fetchFromPrestashopApi("/order_slip", {
+      method: "POST",
+      headers: { "Content-Type": "application/xml" },
+      body: xmlData,
+    });
+
+    toast.success("Refund order slip created");
+  }
+
+  // Cancel the order
+  await updateOrderState(
+    order.id,
+    ORDER_STATES.CANCELED,
+    format(new Date(), "yyyy-MM-dd HH:mm:ss", { in: utc }),
   );
 }

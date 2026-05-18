@@ -23,6 +23,7 @@ export interface LanguageField {
 export interface ProductReadXML {
   id: number;
   name: LanguageField;
+  wholesale_price: number;
   associations: {
     images: {
       image: MaybeArray<{
@@ -57,7 +58,7 @@ export interface CombinationDetailXML {
   price: number;
   ean13?: string;
   upc?: string;
-  wholesale_price?: number;
+  wholesale_price: number;
   weight?: number;
   minimal_quantity?: number;
   default_on?: string;
@@ -101,6 +102,26 @@ export interface OrderReadXML {
     "#text": number;
   };
   date_add: string;
+
+  conversion_rate: number;
+  total_shipping_tax_incl: number;
+  total_shipping_tax_excl: number;
+
+  associations: {
+    order_rows: {
+      order_row: MaybeArray<{
+        id: number;
+        product_id: {
+          "#text": number;
+        };
+        product_attribute_id: number;
+        product_reference: string;
+        product_name: string;
+        product_quantity: number;
+        unit_price_tax_incl: number;
+      }>;
+    }
+  };
 
   // Not an association but manually added in the code after fetching order details
   order_details?: OrderDetailReadXML[];
