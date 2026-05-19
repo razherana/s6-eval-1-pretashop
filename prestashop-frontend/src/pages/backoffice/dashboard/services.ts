@@ -833,33 +833,15 @@ export async function calculateProfitByCategory(
 export async function calculateTotalProfitAndCost(
   orders: OrderReadXML[],
   products: ProductReadXML[],
-  combinationCache?: Map<number, CombinationDetailXML[]>,
 ): Promise<{ totalProfitTtc: number; totalCostFromOrders: number }> {
   // Build wholesale price map with combination support
   const wholesaleMap = new Map<string, number>();
 
-  for (const product of products) {
+  for (const product of products) 
     // Base product wholesale price
     if (product.wholesale_price !== undefined && product.wholesale_price !== null) {
-      wholesaleMap.set(`${product.id}_0`, Number(product.wholesale_price));
+      wholesaleMap.set(`${product.id}`, Number(product.wholesale_price));
     }
-
-    // Combination wholesale prices
-    const combos = assureArray(
-      product.associations?.combinations?.combination,
-    )?.length
-      ? await fetchProductCombinations(product.id, combinationCache)
-      : [];
-
-    for (const combo of combos) {
-      if (combo.wholesale_price !== undefined && combo.wholesale_price !== null) {
-        wholesaleMap.set(
-          `${product.id}_${combo.id}`,
-          Number(combo.wholesale_price),
-        );
-      }
-    }
-  }
 
   let totalProfitTtc = 0;
   let totalCostFromOrders = 0;
@@ -875,10 +857,9 @@ export async function calculateTotalProfitAndCost(
     const rows = assureArray(order.associations?.order_rows?.order_row);
     for (const row of rows) {
       const productId = row.product_id["#text"];
-      const combinationId = row.product_attribute_id || 0;
       const quantity = row.product_quantity || 0;
       const salePriceTtc = row.unit_price_tax_incl || 0;
-      const key = `${productId}_${combinationId}`;
+      const key = `${productId}`;
       const wholesalePrice = wholesaleMap.get(key) ?? 0;
 
       totalCostFromOrders += wholesalePrice * quantity;
@@ -978,7 +959,7 @@ export async function fetchAndCalculateAllStats(
       products,
       combinationCache,
     ),
-    calculateTotalProfitAndCost(orders, products, combinationCache),
+    calculateTotalProfitAndCost(orders, products),
   ]);
 
   const totalPurchase = calculateTotalPurchaseCost(
