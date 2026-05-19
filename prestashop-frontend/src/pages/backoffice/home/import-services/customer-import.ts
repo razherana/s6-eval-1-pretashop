@@ -1138,7 +1138,7 @@ export async function importCustomersFromFile(
 }
 
 // Decrease stock quantities for all products in an order
-async function removeStock(
+export async function removeStock(
   orderId: number,
   languageData: LanguageData,
   dateAdd: string,

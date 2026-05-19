@@ -8,6 +8,7 @@ import {
 } from "../../home/types";
 import {
   processCompleteOrderFlow,
+  removeStock,
   updateOrderState,
 } from "../../home/import-services/customer-import";
 import { assureArray, PrestaShopXMLConverter } from "@/utils/xml";
@@ -348,7 +349,7 @@ export async function processPayment(
 }
 
 // Process delivery for an order that has already been paid (starts from SHIPPED, ends at DELIVERED)
-export async function processDelivery(order: OrderReadXML): Promise<void> {
+export async function processDelivery(order: OrderReadXML, languageData: LanguageData, dateAdd: string): Promise<void> {
   if (order.reference?.startsWith("CART-")) {
     toast.error("Cannot process a cart. Create an order first.");
     return;
@@ -359,6 +360,9 @@ export async function processDelivery(order: OrderReadXML): Promise<void> {
     ORDER_STATES.DELIVERED,
     format(new Date(), "yyyy-MM-dd HH:mm:ss", { in: utc }),
   );
+
+  // Remove stock
+  await removeStock(order.id, languageData, dateAdd, false);
 }
 
 export async function processCancel(order: OrderReadXML): Promise<void> {

@@ -114,7 +114,7 @@ export function OrdersManagementPage() {
   const handleDeliver = async (order: OrderReadXML) => {
     setProcessingOrder(true);
     try {
-      await processDelivery(order);
+      await processDelivery(order, language, format(new Date(), "yyyy-MM-dd HH:mm:ss", { in: utc }));
 
       // Reload orders
       const ordersData = await fetchAllOrdersWithCarts(100);
@@ -130,7 +130,7 @@ export function OrdersManagementPage() {
 
   const handleCancel = async (order: OrderReadXML) => {
     setProcessingOrder(true);
-  
+
     try {
       await processCancel(order);
 
