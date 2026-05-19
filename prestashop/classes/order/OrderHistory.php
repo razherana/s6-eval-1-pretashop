@@ -436,13 +436,18 @@ class OrderHistoryCore extends ObjectModel
         ], null, false, true, false, $order->id_shop);
 
         // sync all stock
-        (new StockManagerAdapter())->updatePhysicalProductQuantity(
-            (int) $order->id_shop,
-            (int) Configuration::get('PS_OS_ERROR'),
-            (int) Configuration::get('PS_OS_CANCELED'),
-            null,
-            (int) $order->id
-        );
+        $canceled = Configuration::get('PS_OS_CANCELED');
+        $awaiting = Configuration::get('PS_OS_AWAITING_PAYMENT');
+
+        if(!($old_os->id == $awaiting && $new_os->id == $canceled)) {
+          (new StockManagerAdapter())->updatePhysicalProductQuantity(
+              (int) $order->id_shop,
+              (int) Configuration::get('PS_OS_ERROR'),
+              (int) Configuration::get('PS_OS_CANCELED'),
+              null,
+              (int) $order->id
+          );
+        }
 
         ShopUrl::resetMainDomainCache();
     }

@@ -827,6 +827,69 @@ export async function calculateProfitByCategory(
 }
 
 /**
+ * Calculate total profit (TTC) and total cost from order rows.
+ * Uses order rows' unit_price_tax_incl for sales price and wholesale prices for cost.
+ */
+export async function calculateTotalProfitAndCost(
+  orders: OrderReadXML[],
+  products: ProductReadXML[],
+  combinationCache?: Map<number, CombinationDetailXML[]>,
+): Promise<{ totalProfitTtc: number; totalCostFromOrders: number }> {
+  // Build wholesale price map with combination support
+  const wholesaleMap = new Map<string, number>();
+
+  for (const product of products) {
+    // Base product wholesale price
+    if (product.wholesale_price !== undefined && product.wholesale_price !== null) {
+      wholesaleMap.set(`${product.id}_0`, Number(product.wholesale_price));
+    }
+
+    // Combination wholesale prices
+    const combos = assureArray(
+      product.associations?.combinations?.combination,
+    )?.length
+      ? await fetchProductCombinations(product.id, combinationCache)
+      : [];
+
+    for (const combo of combos) {
+      if (combo.wholesale_price !== undefined && combo.wholesale_price !== null) {
+        wholesaleMap.set(
+          `${product.id}_${combo.id}`,
+          Number(combo.wholesale_price),
+        );
+      }
+    }
+  }
+
+  let totalProfitTtc = 0;
+  let totalCostFromOrders = 0;
+
+  for (const order of orders) {
+    const stateId = order.current_state["#text"];
+    if (
+      stateId === ORDER_STATES.CANCELED ||
+      stateId === ORDER_STATES.AWAITING_CASH_ON_DELIVERY
+    )
+      continue;
+
+    const rows = assureArray(order.associations?.order_rows?.order_row);
+    for (const row of rows) {
+      const productId = row.product_id["#text"];
+      const combinationId = row.product_attribute_id || 0;
+      const quantity = row.product_quantity || 0;
+      const salePriceTtc = row.unit_price_tax_incl || 0;
+      const key = `${productId}_${combinationId}`;
+      const wholesalePrice = wholesaleMap.get(key) ?? 0;
+
+      totalCostFromOrders += wholesalePrice * quantity;
+      totalProfitTtc += (salePriceTtc - wholesalePrice) * quantity;
+    }
+  }
+
+  return { totalProfitTtc, totalCostFromOrders };
+}
+
+/**
  * Unified function that fetches all data once and computes all dashboard stats.
  */
 export async function fetchAndCalculateAllStats(
@@ -835,6 +898,8 @@ export async function fetchAndCalculateAllStats(
   totalSalesHt: number;
   totalPurchase: number;
   categoryProfits: CategoryProfit[];
+  totalProfitTtc: number;
+  totalCostFromOrders: number;
 }> {
   // Fetch all shared data in parallel
   const [
@@ -905,7 +970,7 @@ export async function fetchAndCalculateAllStats(
   const combinationCache = new Map<number, CombinationDetailXML[]>();
 
   // Compute all stats
-  const [totalSalesHt, categoryProfits] = await Promise.all([
+  const [totalSalesHt, categoryProfits, profitAndCost] = await Promise.all([
     calculateTotalSalesHt(orders, products, combinationCache),
     calculateProfitByCategory(
       orders,
@@ -913,6 +978,7 @@ export async function fetchAndCalculateAllStats(
       products,
       combinationCache,
     ),
+    calculateTotalProfitAndCost(orders, products, combinationCache),
   ]);
 
   const totalPurchase = calculateTotalPurchaseCost(
@@ -921,6 +987,12 @@ export async function fetchAndCalculateAllStats(
     stockMovements,
   );
 
-  return { totalSalesHt, totalPurchase, categoryProfits };
+  return {
+    totalSalesHt,
+    totalPurchase,
+    categoryProfits,
+    totalProfitTtc: profitAndCost.totalProfitTtc,
+    totalCostFromOrders: profitAndCost.totalCostFromOrders,
+  };
 }
 

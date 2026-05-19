@@ -111,10 +111,12 @@ export function DashboardPage() {
     return filteredStockRows.slice(start, start + stockPageSize);
   }, [filteredStockRows, stockPage]);
 
-  // Total sales HT and total purchase cost
+  // Total sales HT, total purchase cost, and profit stats
   const [totalSalesHt, setTotalSalesHt] = useState<number>(0);
   const [totalPurchase, setTotalPurchase] = useState<number>(0);
   const [categoryProfits, setCategoryProfits] = useState<CategoryProfit[]>([]);
+  const [totalProfitTtc, setTotalProfitTtc] = useState<number>(0);
+  const [totalCostFromOrders, setTotalCostFromOrders] = useState<number>(0);
 
   // Daily breakdown table pagination (page state only, memo defined after allDailyStats)
   const [dailyPage, setDailyPage] = useState(1);
@@ -146,6 +148,8 @@ export function DashboardPage() {
       setTotalSalesHt(stats.totalSalesHt);
       setTotalPurchase(stats.totalPurchase);
       setCategoryProfits(stats.categoryProfits);
+      setTotalProfitTtc(stats.totalProfitTtc);
+      setTotalCostFromOrders(stats.totalCostFromOrders);
     } catch (err) {
       console.error("Error loading dashboard data:", err);
       setError("Failed to load dashboard data");
@@ -257,8 +261,8 @@ export function DashboardPage() {
           </div>
         </header>
         <main className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-            {Array.from({ length: 6 }).map((_, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-4 xl:grid-cols-4 gap-4 mb-8">
+            {Array.from({ length: 8 }).map((_, i) => (
               <Skeleton key={i} className="h-32" />
             ))}
           </div>
@@ -351,7 +355,7 @@ export function DashboardPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
@@ -455,7 +459,41 @@ export function DashboardPage() {
                 {formatCurrency(totalPurchase)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Total purchase cost (wholesale)
+                Total purchase cost of bought products
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4" />
+                Total Purchase (orders)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-rose-600">
+                {formatCurrency(totalCostFromOrders)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Cost from orders (wholesale)
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Total Profit (TTC)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-emerald-600">
+                {formatCurrency(totalProfitTtc)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Revenue TTC - wholesale cost
               </p>
             </CardContent>
           </Card>

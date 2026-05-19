@@ -244,7 +244,7 @@ export async function fetchOrderDetails(
     const orderDetails = response.order_details.order_detail;
     console.log(`Fetched order details for order ID ${orderId}:`, orderDetails);
 
-    return response.order_details.order_detail;
+    return assureArray(response.order_details?.order_detail);
   } catch (error) {
     console.error("Error fetching order details:", error);
     throw error;
@@ -268,12 +268,7 @@ export async function fetchOrderHistories(
       };
     }>(`/order_histories?${query.toString()}`, { method: "GET" });
 
-    if (response.order_histories.order_history) {
-      return Array.isArray(response.order_histories.order_history)
-        ? response.order_histories.order_history
-        : [response.order_histories.order_history];
-    }
-    return [];
+    return assureArray(response.order_histories?.order_history);
   } catch (error) {
     console.error("Error fetching order histories:", error);
     throw error;
@@ -297,12 +292,7 @@ export async function fetchOrderInvoices(
       };
     }>(`/order_invoices?${query.toString()}`, { method: "GET" });
 
-    if (response.order_invoices.order_invoice) {
-      return Array.isArray(response.order_invoices.order_invoice)
-        ? response.order_invoices.order_invoice
-        : [response.order_invoices.order_invoice];
-    }
-    return [];
+    return assureArray(response.order_invoices?.order_invoice);
   } catch (error) {
     console.error("Error fetching order invoices:", error);
     throw error;
@@ -326,12 +316,7 @@ export async function fetchCustomers(
       { method: "GET" },
     );
 
-    if (response.customers.customer) {
-      return Array.isArray(response.customers.customer)
-        ? response.customers.customer
-        : [response.customers.customer];
-    }
-    return [];
+    return assureArray(response.customers?.customer);
   } catch (error) {
     console.error("Error fetching customers:", error);
     throw error;

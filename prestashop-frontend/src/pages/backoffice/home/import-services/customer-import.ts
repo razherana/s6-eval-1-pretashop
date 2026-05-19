@@ -1015,11 +1015,11 @@ export async function importCustomersFromFile(
                   );
 
                   // Remove from stock with pre-fetched details (no extra API call)
-                  await processStockRemovalFromDetails(
-                    orderDetailsData,
-                    languageData,
-                    date_add_str,
-                  );
+                  // await processStockRemovalFromDetails(
+                  //   orderDetailsData,
+                  //   languageData,
+                  //   date_add_str,
+                  // );
 
                   console.log(`Order #${order.reference} canceled`);
                   break;
