@@ -69,6 +69,7 @@ import { SelectLanguageCurrency } from "@/components/ui-manual/select-lang";
 import { utc } from "@date-fns/utc";
 import { StockHistoryDialog } from "./components/StockHistoryDialog";
 import { ResultsPagination } from "../home/components/import-data/ResultsPagination";
+import Decimal from "decimal.js";
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -123,7 +124,7 @@ export function DashboardPage() {
   const dailyPageSize = 15;
 
   const formatCurrency = useCallback(
-    (amount: number) => {
+    (amount: number | string) => {
       return getFormattedPrice(
         amount,
         language.currency,
@@ -491,6 +492,23 @@ export function DashboardPage() {
             <CardContent>
               <p className="text-3xl font-bold text-emerald-600">
                 {formatCurrency(totalProfitTtc)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Revenue TTC - wholesale cost
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Total Profit TTC (stock movements)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className={`text-3xl font-bold ${ Number(dashboardData.grandTotal) > totalPurchase ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {formatCurrency(new Decimal(dashboardData.grandTotal).minus(new Decimal(totalPurchase)).toFixed(2))}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 Revenue TTC - wholesale cost

@@ -1,4 +1,5 @@
 import type { LanguageField } from "@/pages/backoffice/home/types";
+import { Decimal } from "decimal.js";
 
 export { LanguageProvider } from "@/providers/LanguageProvider";
 export { useLanguage } from "@/hooks/useLanguage";
@@ -19,8 +20,9 @@ export function getWithLanguage(
   return languageEntry ? languageEntry["#text"] : "";
 }
 
-export function getFormattedPrice(price: number, currency: string, conversionChange: number, locale: string): string {
-  return `${currency} ${(price * conversionChange).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export function getFormattedPrice(price: number | string, currency: string, conversionChange: number, locale: string): string {
+  const priceValue = typeof price === "string" ? new Decimal(price) : new Decimal(price);
+  return `${currency} ${Number(priceValue.mul(new Decimal(conversionChange)).toFixed(2)).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function upperFirstLetter(str: string): string {

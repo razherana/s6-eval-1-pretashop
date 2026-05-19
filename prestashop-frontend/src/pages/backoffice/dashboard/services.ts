@@ -24,6 +24,8 @@ import {
   fetchStockAtDate,
 } from "@/pages/backoffice/home/services/stockServices";
 
+import Decimal from "decimal.js"
+
 export interface DailyStats {
   date: string;
   orderCount: number;
@@ -34,9 +36,9 @@ export interface DailyStats {
 
 export interface DashboardData {
   dailyStats: DailyStats[];
-  grandTotal: number;
+  grandTotal: string;
   totalOrders: number;
-  averageOrderValue: number;
+  averageOrderValue: string;
   bestDay: DailyStats | null;
 }
 
@@ -184,14 +186,14 @@ export function calculateDashboardData(
   }
 
   const grandTotal = filteredStats.reduce(
-    (sum, day) => sum + day.totalAmount,
-    0,
+    (sum, day) => new Decimal(sum).plus(day.totalAmount),
+    new Decimal(0),
   );
   const totalOrders = filteredStats.reduce(
     (sum, day) => sum + day.orderCount,
     0,
   );
-  const averageOrderValue = totalOrders > 0 ? grandTotal / totalOrders : 0;
+  const averageOrderValue = totalOrders > 0 ? grandTotal.div(totalOrders) : new Decimal(0);
 
   const bestDay =
     filteredStats.length > 0
@@ -202,9 +204,9 @@ export function calculateDashboardData(
 
   return {
     dailyStats: filteredStats,
-    grandTotal,
+    grandTotal: grandTotal.toFixed(2),
     totalOrders,
-    averageOrderValue,
+    averageOrderValue: averageOrderValue.toFixed(2),
     bestDay,
   };
 }
