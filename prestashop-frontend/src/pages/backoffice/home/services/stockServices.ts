@@ -9,6 +9,7 @@ import { assureArray } from "@/utils/xml";
 import { utc } from "@date-fns/utc/utc";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
+import { fetchVirtualMovementsForProduct } from "../../dashboard/services";
 
 const EMPLOYEE_ID_STOCK_MVT_REASON = 1; // Employee id 1 used
 
@@ -27,6 +28,44 @@ export interface ProductStockInfo {
   // Map of id_product_attribute -> stock info
   stocks: Map<number, StockAvailable>;
   defaultStock: StockAvailable | null; // id_product_attribute = 0
+}
+
+export async function fetchProductStockWithVirtual(
+  productId: number,
+) : Promise<ProductStockInfo> {
+  const stockInfo = await fetchProductStock(productId);
+
+  // Fetch virtual movements for each combination to adjust stock
+  for (const [combinationId, stock] of stockInfo.stocks.entries()) {
+    const movements = await fetchVirtualMovementsForProduct(
+      productId,
+      combinationId,
+    );
+
+    let virtualQuantity = 0;
+    for (const mvt of movements) {
+      virtualQuantity += mvt.sign * mvt.physical_quantity;
+    }
+
+    stock.quantity += virtualQuantity;
+  }
+
+  // Also adjust default stock if needed
+  if (stockInfo.defaultStock) {
+    const defaultMovements = await fetchVirtualMovementsForProduct(
+      productId,
+      0,
+    );
+
+    let defaultVirtualQuantity = 0;
+    for (const mvt of defaultMovements) {
+      defaultVirtualQuantity += mvt.sign * mvt.physical_quantity;
+    }
+
+    stockInfo.defaultStock.quantity += defaultVirtualQuantity;
+  }
+
+  return stockInfo;
 }
 
 // Fetch stock availables for a product

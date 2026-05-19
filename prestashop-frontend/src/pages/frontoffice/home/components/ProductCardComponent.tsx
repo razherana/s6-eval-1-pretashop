@@ -9,7 +9,7 @@ import { getWithLanguage, getFormattedPrice } from '@/utils/lang';
 import { ProductCombinationSelectComponent } from './ProductCombinationSelectComponent';
 import type { ProductReadXML } from '@/pages/backoffice/home/types';
 import { API_QUERY } from '@/utils/url';
-import { fetchProductStock } from '@/pages/backoffice/home/services/stockServices';
+import {  fetchProductStockWithVirtual } from '@/pages/backoffice/home/services/stockServices';
 
 interface CombinationOption {
   id: number;
@@ -86,7 +86,7 @@ export function ProductCardComponent({
     (async () => {
       try {
         setStockLoading(true);
-        const stockInfo = await fetchProductStock(product.id);
+        const stockInfo = await fetchProductStockWithVirtual(product.id);
         const map = new Map<number, number>();
 
         // Default stock (combinationId = 0)

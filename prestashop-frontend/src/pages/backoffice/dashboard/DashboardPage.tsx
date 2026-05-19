@@ -485,7 +485,7 @@ export function DashboardPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
-                Total Profit (TTC)
+                Total Profit TTC (orders)
               </CardTitle>
             </CardHeader>
             <CardContent>
